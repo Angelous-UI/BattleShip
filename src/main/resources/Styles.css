@@ -1,0 +1,115 @@
+/**
+MainMenu part
+ */
+
+.play-button {
+    -fx-background-image: url('Battleship-Images/2.png');
+    -fx-background-size: cover;
+    -fx-background-repeat: no-repeat;
+    -fx-background-position: center;
+
+
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+    -fx-text-fill: transparent;
+
+    -fx-cursor: hand;
+}
+
+.play-button:hover {
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 0, 0.4), 10, 0.77, 0, 0);
+}
+
+
+.play-button:pressed {
+    -fx-translate-y: 1px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 5, 0.5, 0, 0);
+}
+
+
+.continue-button {
+    /* Background image */
+    -fx-background-image: url('Battleship-Images/1.png');
+    -fx-background-size: cover;
+    -fx-background-repeat: no-repeat;
+    -fx-background-position: center;
+
+
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+    -fx-text-fill: transparent;
+
+    -fx-cursor: hand;
+}
+
+.continue-button:hover {
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 0, 0.4), 10, 0.77, 0, 0);
+}
+
+
+.continue-button:pressed {
+    -fx-translate-y: 1px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 5, 0.5, 0, 0);
+}
+
+.exit-button {
+    /* Background image */
+    -fx-background-image: url('Battleship-Images/3.png');
+    -fx-background-size: cover;
+    -fx-background-repeat: no-repeat;
+    -fx-background-position: center;
+
+
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+    -fx-text-fill: transparent;
+
+    -fx-cursor: hand;
+}
+
+.exit-button:hover {
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 0, 0.4), 10, 0.77, 0, 0);
+}
+
+
+.exit-button:pressed {
+    -fx-translate-y: 1px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 5, 0.5, 0, 0);
+}
+
+/**
+Game part
+ */
+
+.Back-button {
+    /* Background image */
+    -fx-background-image: url('Battleship-Images/4.png');
+    -fx-background-size: cover;
+    -fx-background-repeat: no-repeat;
+    -fx-background-position: center;
+
+
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+    -fx-text-fill: transparent;
+
+    -fx-cursor: hand;
+}
+
+.Back-button:hover {
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 0, 0.4), 10, 0.77, 0, 0);
+}
+
+
+.Back-button:pressed {
+    -fx-translate-y: 1px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 5, 0.5, 0, 0);
+}
