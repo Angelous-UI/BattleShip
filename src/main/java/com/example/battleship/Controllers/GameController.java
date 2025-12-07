@@ -1,6 +1,7 @@
 package com.example.battleship.Controllers;
 
 import com.example.battleship.Views.GameView;
+import com.example.battleship.Views.MainMenuView;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.PauseTransition;
@@ -8,6 +9,8 @@ import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.media.Media;
@@ -18,7 +21,10 @@ import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
+
 import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 import java.util.ResourceBundle;
 
@@ -31,34 +37,28 @@ public class GameController implements Initializable {
     private Button GoBackButton;
 
     @FXML
-    private AnchorPane menuPane2;
+    private Canvas canvas;
 
     private MediaPlayer mediaPlayer;
     private Stage stage;
 
-
-    int[][] board = {
-            {0,0,0,0,0,0,0,0},
-            {1,1,1,1,0,0,0,0},
-            {0,0,1,1,0,1,0,0},
-            {0,0,1,1,0,1,1,0},
-            {1,1,1,0,0,0,0,0},
-            {0,0,1,1,0,0,0,0},
-            {0,0,0,0,1,1,0,0},
-            {0,0,0,0,0,1,0,0}
-    };
-
+    Map<String, Boolean> board = new HashMap<>();
 
     public void setStage(Stage stage) {
         this.stage = stage;
     }
 
-/*    public void drawBoard() {
-        Canvas canvas = new Canvas(board[0][0], board[0][1]);
-    }*/
 
     private void setupBackgroundVideo() {
         try {
+            // Limpiar primero, sin tomar en cuenta botones
+            videoContainer.getChildren().removeIf(node -> node instanceof MediaView);
+
+            if (mediaPlayer != null) {
+                mediaPlayer.stop();
+                mediaPlayer.dispose();
+            }
+
             String videoPath = getClass().getResource("/Battleship-Videos/Game.mp4").toExternalForm();
             Media media = new Media(videoPath);
             mediaPlayer = new MediaPlayer(media);
@@ -68,7 +68,11 @@ public class GameController implements Initializable {
             mediaView.fitHeightProperty().bind(videoContainer.heightProperty());
             mediaView.setPreserveRatio(false);
 
-            videoContainer.getChildren().add(mediaView);
+
+            mediaView.setMouseTransparent(true);
+
+
+            videoContainer.getChildren().add(0, mediaView);
 
             mediaPlayer.setOnEndOfMedia(() -> {
                 mediaPlayer.seek(Duration.ZERO);
@@ -76,25 +80,19 @@ public class GameController implements Initializable {
             });
 
             mediaPlayer.setOnReady(() -> {
-                Platform.runLater(() -> {
-                    if (stage != null) {
-                        stage.show();
-                    }
-                });
+                System.out.println(" Video Running Correctly"); //mensajes por consola quiero saber que lo que pasa
                 mediaPlayer.play();
             });
 
             mediaPlayer.setVolume(0.3);
 
         } catch (Exception e) {
-            System.err.println("Error while trying playing the video: " + e.getMessage());
+            System.err.println(" Error while trying playing the video: " + e.getMessage()); //mensajes por consola quiero saber que lo que pasa
             e.printStackTrace();
             videoContainer.setStyle("-fx-background-color: #001a33;");
-            if (stage != null) {
-                stage.show();
-            }
         }
     }
+
 
     public void stopVideo() {
         if (mediaPlayer != null) {
@@ -130,6 +128,10 @@ public class GameController implements Initializable {
     }
 
     private void createExplosion(double x, double y) {
+        if (videoContainer == null) {
+            System.out.println("menuPane2 == null se cancela la explosuion");
+            return;
+        }
         Random random = new Random();
         int particleCount = 30;
 
@@ -139,7 +141,7 @@ public class GameController implements Initializable {
             particle.setLayoutX(x);
             particle.setLayoutY(y);
 
-            menuPane2.getChildren().add(particle);
+            videoContainer.getChildren().add(particle);
 
             double angle = Math.toRadians(random.nextInt(360));
             double distance = random.nextDouble() * 100 + 50;
@@ -162,7 +164,7 @@ public class GameController implements Initializable {
             );
 
             timeline.play();
-            timeline.setOnFinished(e -> menuPane2.getChildren().remove(particle));
+            timeline.setOnFinished(e -> videoContainer.getChildren().remove(particle));
         }
     }
 
@@ -194,18 +196,20 @@ public class GameController implements Initializable {
 
     private void loadMainMenuView() {
         try {
-            GameView mainmenuView = new GameView();
+            MainMenuView mainMenuView = new MainMenuView();
 
             Stage currentStage = (Stage) GoBackButton.getScene().getWindow();
             currentStage.close();
 
-            mainmenuView.show();
+
+            mainMenuView.show();
 
         } catch (Exception e) {
-            System.err.println("Error loading Game view: " + e.getMessage());
+            System.err.println("Error loading MainMenu view: " + e.getMessage());
             e.printStackTrace();
         }
     }
+
 
     @FXML
     private void onBackMenu() {

@@ -139,65 +139,68 @@ public class MainMenuController implements Initializable {
     }
 
     private void setupBackgroundVideo() {
-        try {
-            String videoPath = getClass().getResource("/Battleship-Videos/MainMenu.mp4").toExternalForm();
-            Media media = new Media(videoPath);
-            mediaPlayer = new MediaPlayer(media);
+        Platform.runLater(() -> {
+            try {
+                System.out.println("1. Starting video");
 
-            MediaView mediaView = new MediaView(mediaPlayer);
-            mediaView.fitWidthProperty().bind(videoContainer.widthProperty());
-            mediaView.fitHeightProperty().bind(videoContainer.heightProperty());
-            mediaView.setPreserveRatio(false);
+                videoContainer.getChildren().removeIf(node -> node instanceof MediaView);
 
-            videoContainer.getChildren().add(mediaView);
+                if (mediaPlayer != null) {
+                    mediaPlayer.stop();
+                    mediaPlayer.dispose();
+                }
 
-            mediaPlayer.setOnEndOfMedia(() -> {
-                mediaPlayer.seek(Duration.ZERO);
-                mediaPlayer.play();
-            });
+                String videoPath = getClass().getResource("/Battleship-Videos/MainMenu.mp4").toExternalForm();
+                System.out.println("2. Video path: " + videoPath);
 
-            /*mediaPlayer.setOnReady(() -> {
-                Platform.runLater(() -> {
-                    if (stage != null) {
+                Media media = new Media(videoPath);
+                mediaPlayer = new MediaPlayer(media);
+
+                System.out.println("3. MediaPlayer created");
+
+                MediaView mediaView = new MediaView(mediaPlayer);
+                mediaView.fitWidthProperty().bind(videoContainer.widthProperty());
+                mediaView.fitHeightProperty().bind(videoContainer.heightProperty());
+                mediaView.setPreserveRatio(false);
+                mediaView.setMouseTransparent(true);
+
+                videoContainer.getChildren().add(0, mediaView);
+                System.out.println("4. MediaView added. childs in videoContainer: " + videoContainer.getChildren().size());
+
+                mediaPlayer.setOnEndOfMedia(() -> {
+                    mediaPlayer.seek(Duration.ZERO);
+                    mediaPlayer.play();
+                });
+
+                mediaPlayer.setOnError(() -> {
+                    System.err.println("ERROR in mediaPlayer: " + mediaPlayer.getError());
+                    // Intentar recargar
+                    mediaPlayer.dispose();
+                    setupBackgroundVideo();
+                });
+
+                mediaPlayer.setOnReady(() -> {
+                    System.out.println("5. Video Ready");
+                    mediaPlayer.play();
+                    System.out.println("6. Running video");
+
+                    if (stage != null && !stage.isShowing()) {
                         stage.show();
                     }
                 });
-                mediaPlayer.play();
-            });*/
-            mediaPlayer.setOnReady(()->{
-                mediaPlayer.play();
 
-                if (stage !=null && !stage.isShowing()){
-                    Platform.runLater(stage::show);
+                mediaPlayer.setVolume(0.3);
+
+            } catch (Exception e) {
+                System.err.println("EXCEPCIÓN en setupBackgroundVideo: " + e.getMessage());
+                e.printStackTrace();
+                videoContainer.setStyle("-fx-background-color: #001a33;");
+                if (stage != null) {
+                    stage.show();
                 }
-            });
-
-            mediaPlayer.setVolume(0.3);
-
-        } catch (Exception e) {
-            System.err.println("Error while trying playing the video: " + e.getMessage());
-            e.printStackTrace();
-            videoContainer.setStyle("-fx-background-color: #001a33;");
-            if (stage != null) {
-                stage.show();
             }
-        }
+        });
     }
-
-    /*private void loadGameView() {
-        try {
-            GameView gameView = new GameView();
-
-            Stage currentStage = (Stage) playButton.getScene().getWindow();
-            currentStage.close();
-
-            gameView.show();
-
-        } catch (Exception e) {
-            System.err.println("Error loading Game view: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }*/
 
     private void loadGameView() {
         try {
@@ -207,7 +210,7 @@ public class MainMenuController implements Initializable {
                 mediaPlayer = null;
             }
 
-            System.gc(); // fuerza la linmpieza
+            System.gc(); // fuerza la limpieza
 
             GameView gameView = new GameView();
 
@@ -220,7 +223,6 @@ public class MainMenuController implements Initializable {
             e.printStackTrace();
         }
     }
-
 
     @FXML
     private void onNewGame() {
