@@ -89,7 +89,7 @@ Game part
 
 .Back-button {
     /* Background image */
-    -fx-background-image: url('Battleship-Images/4.png');
+    -fx-background-image: url('/Battleship-Images/4.png');
     -fx-background-size: cover;
     -fx-background-repeat: no-repeat;
     -fx-background-position: center;
@@ -100,7 +100,6 @@ Game part
     -fx-border-width: 0;
     -fx-padding: 0;
     -fx-text-fill: transparent;
-
     -fx-cursor: hand;
 }
 

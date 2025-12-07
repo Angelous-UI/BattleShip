@@ -1,6 +1,6 @@
 package com.example.battleship;
 
-import com.example.battleship.views.MainMenuView;
+import com.example.battleship.Views.MainMenuView;
 import javafx.application.Application;
 import javafx.stage.Stage;
 
