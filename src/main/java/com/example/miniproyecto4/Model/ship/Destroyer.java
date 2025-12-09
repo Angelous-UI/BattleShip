@@ -1,30 +1,56 @@
 package com.example.miniproyecto4.Model.ship;
 
-public class Destroyer implements IShip{
-    private final boolean sunken;
-    private boolean touched;
+public class Destroyer implements IShip {
+    private boolean sunken;
+    private int hitCount;
     private final int positionX;
     private final int positionY;
     private final Direction direction;
+    private final int shipSize = 2;
 
-    public Destroyer( int positionX, int positionY, Direction direction){
+    public Destroyer(int positionX, int positionY, Direction direction) {
         this.positionX = positionX;
         this.positionY = positionY;
         this.sunken = false;
+        this.hitCount = 0;
         this.direction = direction;
     }
 
     @Override
-    public boolean isSunken(){return sunken;}
-    @Override
-    public boolean isTouched(){return touched;}
-    @Override
-    public int getRow(){return positionY;}
-    @Override
-    public int getCol(){return positionX;}
-    @Override
-    public int getShipSize(){return 2;}
-    @Override
-    public Direction getDirection(){return direction;}
+    public boolean isSunken() {
+        return sunken;
+    }
 
+    @Override
+    public void registerHit() {
+        hitCount++;
+        if (hitCount >= shipSize) {
+            sunken = true;
+        }
+    }
+
+    @Override
+    public int getHitCount() {
+        return hitCount;
+    }
+
+    @Override
+    public int getRow() {
+        return positionY;
+    }
+
+    @Override
+    public int getCol() {
+        return positionX;
+    }
+
+    @Override
+    public int getShipSize() {
+        return shipSize;
+    }
+
+    @Override
+    public Direction getDirection() {
+        return direction;
+    }
 }
