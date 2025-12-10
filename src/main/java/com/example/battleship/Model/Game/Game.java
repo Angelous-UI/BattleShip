@@ -594,7 +594,7 @@ public class Game implements IGame {
      * @return the fleet list
      */
     @Override
-    public List<IShip> getFleet() {
+    public List<IShip> getMachineFleet() {
         return fleet;
     }
 

@@ -20,6 +20,7 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.media.Media;
@@ -59,6 +60,7 @@ public class GameController implements Initializable {
     private final int HEIGHT_CELL = 301/10;
 
     private final int SIZE = 10;
+    private int cell;
 
     private int currentShipSize = 4;   // Comenzamos con portaaviones
     private boolean vertical = false;
@@ -69,6 +71,10 @@ public class GameController implements Initializable {
     List<int[]> coords;
     private BoardRenderer boardRenderer = new BoardRenderer();
     private Stack<IShip> ships = new Stack<>();
+
+    private Image missImage;
+    private Image hitImage;
+    private Image explosionImage;
 
     // ================= FLEET ORDER =================
     private int[] fleet = {4,3,3,2,2,2,1,1,1,1};
@@ -191,17 +197,30 @@ public class GameController implements Initializable {
         playerCanvas.setOnMouseExited(e -> drawPlacedShips());
 
         playerCanvas.setFocusTraversable(true);
-        playerCanvas.setOnKeyPressed(ke -> {
-            if (ke.getCode() == KeyCode.R || ke.getCode() == KeyCode.SPACE) {
-                vertical = !vertical;
-                drawPlacedShips();
-            }
+        playerCanvas.setOnKeyPressed(this::rotate);
+
+        Platform.runLater(() -> playerCanvas.requestFocus());
+
+        playerCanvas.setOnMouseClicked(e -> {
+            playerCanvas.requestFocus();
+            placeShip(e);
         });
 
         drawGrid(gPlayer);
         drawGrid(gEnemy);
         enemyCanvas.setOnMouseClicked(this::onEnemyClick);
         drawEnemyFleet();
+
+        missImage = new Image(getClass().getResource("/Battleship-Images/12.png").toExternalForm());
+        hitImage = new Image(getClass().getResource("/Battleship-Images/11.png").toExternalForm());
+        explosionImage = new Image(getClass().getResource("/Battleship-Images/13.png").toExternalForm());
+    }
+
+    private void rotate(KeyEvent ke){
+        if (ke.getCode() == KeyCode.R || ke.getCode() == KeyCode.SPACE) {
+            vertical = !vertical;
+            drawPlacedShips();
+        }
     }
 
     private void drawGrid(GraphicsContext g) {
@@ -343,7 +362,7 @@ public class GameController implements Initializable {
     }
 
     private void drawEnemyFleet() {
-        enemyShips = game.getFleet();
+        enemyShips = game.getMachineFleet();
         drawEnemyShips(enemyShips);
     }
 
@@ -594,7 +613,79 @@ public class GameController implements Initializable {
 
         System.out.println("🎯 Click en enemigo: row=" + boardRow + " col=" + boardCol);
 
+
         handleBoardClick(boardEnemy, null, boardRow, boardCol);
+        int cell = boardEnemy.getCell(boardRow, boardCol);
+        System.out.println("🎯 valor celda después del disparo: " + cell);
+
+        redrawEnemyBoard();
+    }
+
+    private void redrawEnemyBoard() {
+        // Limpia el canvas
+        gEnemy.clearRect(0, 0, enemyCanvas.getWidth(), enemyCanvas.getHeight());
+
+        // Redibuja la cuadrícula
+        drawGrid(gEnemy);
+
+        // Dibuja solo los barcos que NO están hundidos
+        List<IShip> enemyFleet = game.getMachineFleet();
+        List<IShip> activeShips = enemyFleet.stream()
+                .filter(ship -> !ship.isSunken())
+                .toList();
+
+        drawEnemyShips(activeShips);
+
+        // Dibuja todos los marcadores de disparos
+        drawAllShotMarkers();
+    }
+
+    private void drawAllShotMarkers() {
+        for (int row = 1; row <= 10; row++) {
+            for (int col = 1; col <= 10; col++) {
+                int cell = boardEnemy.getCell(row, col);
+
+                // Agua fallada
+                if (cell == 2) {
+                    gEnemy.drawImage(missImage,
+                            (col - 1) * WIDTH_CELL,
+                            (row - 1) * HEIGHT_CELL,
+                            WIDTH_CELL, HEIGHT_CELL);
+                }
+                // Impacto en barco
+                else if (cell == 3) {
+                    gEnemy.drawImage(explosionImage,
+                            (col - 1) * WIDTH_CELL,
+                            (row - 1) * HEIGHT_CELL,
+                            WIDTH_CELL, HEIGHT_CELL);
+                }
+            }
+        }
+
+        // Dibuja escombros de barcos hundidos
+        List<IShip> enemyFleet = game.getMachineFleet();
+        for (IShip ship : enemyFleet) {
+            if (ship.isSunken()) {
+                drawSunkenShip(ship);
+            }
+        }
+    }
+
+    private void drawSunkenShip(IShip ship) {
+        List<int[]> coords = game.getShipCoordinates(ship);
+
+        for (int[] coord : coords) {
+            int row = coord[0];
+            int col = coord[1];
+
+            gEnemy.drawImage(
+                    hitImage,
+                    (col - 1) * WIDTH_CELL,
+                    (row - 1) * HEIGHT_CELL,
+                    WIDTH_CELL,
+                    HEIGHT_CELL
+            );
+        }
     }
 
 }

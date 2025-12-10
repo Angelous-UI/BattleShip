@@ -9,7 +9,7 @@ public class Frigate implements IShip {
     private int hitCount;
     private final int positionX;
     private final int positionY;
-    private final Direction direction;
+    private Direction direction;
     private final int shipSize = 1;
 
     /**
@@ -45,6 +45,15 @@ public class Frigate implements IShip {
         }
     }
 
+    @Override
+    public void rotate() {
+        switch (direction) {
+            case RIGHT -> direction = Direction.DOWN;
+            case DOWN -> direction = Direction.RIGHT;
+            case LEFT -> direction = Direction.UP;
+            case UP -> direction = Direction.LEFT;
+        }
+    }
 
     @Override
     public int getHitCount() {

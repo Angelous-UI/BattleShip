@@ -51,6 +51,8 @@ public interface IShip {
      *
      * @return ship size in cells
      */
+    void rotate();
+
     int getShipSize();
     /**
      * Returns the placement direction for the ship.

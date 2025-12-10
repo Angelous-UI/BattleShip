@@ -10,8 +10,8 @@ import java.util.Map;
 public class Board implements IBoard{
     private final int ROWS = 10;
     private final int COLS = 10;
-
     private final Map<String, Integer> board;
+
 
 
     /**

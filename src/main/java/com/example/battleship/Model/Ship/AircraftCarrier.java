@@ -9,7 +9,7 @@ public class AircraftCarrier implements IShip {
     private int hitCount;
     private final int positionX;
     private final int positionY;
-    private final Direction direction;
+    private Direction direction;
     private final int shipSize = 4;
 
     /**
@@ -46,6 +46,16 @@ public class AircraftCarrier implements IShip {
         hitCount++;
         if (hitCount >= shipSize) {
             sunken = true;
+        }
+    }
+
+    @Override
+    public void rotate() {
+        switch (direction) {
+            case RIGHT -> direction = Direction.DOWN;
+            case DOWN -> direction = Direction.RIGHT;
+            case LEFT -> direction = Direction.UP;
+            case UP -> direction = Direction.LEFT;
         }
     }
 
