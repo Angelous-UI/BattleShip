@@ -3,7 +3,7 @@ module com.example.battleship {
     requires javafx.fxml;
     requires javafx.media;
     requires javafx.graphics;
-    //requires com.example.battleship;
+    requires javafx.base;
 
     opens com.example.battleship to javafx.fxml;
     opens com.example.battleship.Controllers to javafx.fxml;

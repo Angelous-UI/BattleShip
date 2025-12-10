@@ -88,7 +88,6 @@ Game part
  */
 
 .Back-button {
-    /* Background image */
     -fx-background-image: url('/Battleship-Images/4.png');
     -fx-background-size: cover;
     -fx-background-repeat: no-repeat;
@@ -111,4 +110,15 @@ Game part
 .Back-button:pressed {
     -fx-translate-y: 1px;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 5, 0.5, 0, 0);
+}
+
+/**
+Stats part
+ */
+
+.Stats-Background {
+    -fx-background-image: url("Battleship-Images/5.png");
+    -fx-background-size: cover;
+    -fx-background-repeat: no-repeat;
+    -fx-background-position: center;
 }
