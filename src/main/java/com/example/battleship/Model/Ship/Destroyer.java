@@ -1,5 +1,9 @@
 package com.example.battleship.Model.Ship;
 
+/**
+ * Destroyer: a ship occupying two cells (size = 2).
+ * Keeps track of hits and sunken state.
+ */
 public class Destroyer implements IShip {
     private boolean sunken;
     private int hitCount;
@@ -8,6 +12,15 @@ public class Destroyer implements IShip {
     private final Direction direction;
     private final int shipSize = 2;
 
+
+
+    /**
+     * Constructs a Destroyer.
+     *
+     * @param positionX 1-based column
+     * @param positionY 1-based row
+     * @param direction placement direction
+     */
     public Destroyer(int positionX, int positionY, Direction direction) {
         this.positionX = positionX;
         this.positionY = positionY;

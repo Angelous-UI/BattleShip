@@ -1,6 +1,7 @@
 package com.example.battleship.Controllers;
 
 import com.example.battleship.Model.Board.Board;
+import com.example.battleship.Model.Game.Game;
 import com.example.battleship.Model.Ship.*;
 import com.example.battleship.Model.Utils.SpriteSheet;
 import com.example.battleship.Views.GameView;
@@ -16,6 +17,8 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
@@ -26,6 +29,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import javafx.scene.control.Alert;
 
 
 import java.net.URL;
@@ -60,29 +64,34 @@ public class GameController implements Initializable {
     private boolean vertical = false;
 
     private Board board;
+    private Board boardEnemy;
+    List<IShip> enemyShips;
+    List<int[]> coords;
+    private BoardRenderer boardRenderer = new BoardRenderer();
     private Stack<IShip> ships = new Stack<>();
 
     // ================= FLEET ORDER =================
     private int[] fleet = {4,3,3,2,2,2,1,1,1,1};
     private int shipIndex = 0;
+    private Game game;
 
     private SpriteSheet carrierSheet = new SpriteSheet(
-            getClass().getResource("/sprites/carrier.png").toExternalForm(),
+            getClass().getResource("/Battleship-Images/portaaviones.png").toExternalForm(),
             WIDTH_CELL, HEIGHT_CELL
     );
 
-    private SpriteSheet battleshipSheet = new SpriteSheet(
-            getClass().getResource("/sprites/battleship.png").toExternalForm(),
+    private SpriteSheet frigateSheet = new SpriteSheet(
+            getClass().getResource("/Battleship-Images/fragata.png").toExternalForm(),
             WIDTH_CELL, HEIGHT_CELL
     );
 
     private SpriteSheet submarineSheet = new SpriteSheet(
-            getClass().getResource("/sprites/submarine.png").toExternalForm(),
+            getClass().getResource("/Battleship-Images/submarinos.png").toExternalForm(),
             WIDTH_CELL, HEIGHT_CELL
     );
 
     private SpriteSheet destroyerSheet = new SpriteSheet(
-            getClass().getResource("/sprites/destroyer.png").toExternalForm(),
+            getClass().getResource("/Battleship-Images/destructores.png").toExternalForm(),
             WIDTH_CELL, HEIGHT_CELL
     );
 
@@ -93,47 +102,67 @@ public class GameController implements Initializable {
 
 
     private void setupBackgroundVideo() {
-        try {
-            // Limpiar primero, sin tomar en cuenta botones
-            videoContainer.getChildren().removeIf(node -> node instanceof MediaView);
+        Platform.runLater(() -> {
+            try {
+                System.out.println("1. Starting video");
 
-            if (mediaPlayer != null) {
-                mediaPlayer.stop();
-                mediaPlayer.dispose();
+                videoContainer.getChildren().removeIf(node -> node instanceof MediaView);
+
+                if (mediaPlayer != null) {
+                    mediaPlayer.stop();
+                    mediaPlayer.dispose();
+                }
+
+                String videoPath = getClass().getResource("/Battleship-Videos/Game.mp4").toExternalForm();
+                System.out.println("2. Video path: " + videoPath);
+
+                Media media = new Media(videoPath);
+                mediaPlayer = new MediaPlayer(media);
+
+                System.out.println("3. MediaPlayer created");
+
+                MediaView mediaView = new MediaView(mediaPlayer);
+                mediaView.fitWidthProperty().bind(videoContainer.widthProperty());
+                mediaView.fitHeightProperty().bind(videoContainer.heightProperty());
+                mediaView.setPreserveRatio(false);
+                mediaView.setMouseTransparent(true);
+
+                videoContainer.getChildren().add(0, mediaView);
+                System.out.println("4. MediaView added. childs in videoContainer: " + videoContainer.getChildren().size());
+
+                mediaPlayer.setOnEndOfMedia(() -> {
+                    mediaPlayer.seek(Duration.ZERO);
+                    mediaPlayer.play();
+                });
+
+                mediaPlayer.setOnError(() -> {
+                    System.err.println("ERROR in mediaPlayer: " + mediaPlayer.getError());
+                    // Intentar recargar
+                    mediaPlayer.dispose();
+                    setupBackgroundVideo();
+                });
+
+                mediaPlayer.setOnReady(() -> {
+                    System.out.println("5. Video Ready");
+                    mediaPlayer.play();
+                    System.out.println("6. Running video");
+
+                    if (stage != null && !stage.isShowing()) {
+                        stage.show();
+                    }
+                });
+
+                mediaPlayer.setVolume(0.3);
+
+            } catch (Exception e) {
+                System.err.println("EXCEPCIÓN en setupBackgroundVideo: " + e.getMessage());
+                e.printStackTrace();
+                videoContainer.setStyle("-fx-background-color: #001a33;");
+                if (stage != null) {
+                    stage.show();
+                }
             }
-
-            String videoPath = getClass().getResource("/Battleship-Videos/Game.mp4").toExternalForm();
-            Media media = new Media(videoPath);
-            mediaPlayer = new MediaPlayer(media);
-
-            MediaView mediaView = new MediaView(mediaPlayer);
-            mediaView.fitWidthProperty().bind(videoContainer.widthProperty());
-            mediaView.fitHeightProperty().bind(videoContainer.heightProperty());
-            mediaView.setPreserveRatio(false);
-
-
-            mediaView.setMouseTransparent(true);
-
-
-            videoContainer.getChildren().add(0, mediaView);
-
-            mediaPlayer.setOnEndOfMedia(() -> {
-                mediaPlayer.seek(Duration.ZERO);
-                mediaPlayer.play();
-            });
-
-            mediaPlayer.setOnReady(() -> {
-                System.out.println(" Video Running Correctly"); //mensajes por consola quiero saber que lo que pasa
-                mediaPlayer.play();
-            });
-
-            mediaPlayer.setVolume(0.3);
-
-        } catch (Exception e) {
-            System.err.println(" Error while trying playing the video: " + e.getMessage()); //mensajes por consola quiero saber que lo que pasa
-            e.printStackTrace();
-            videoContainer.setStyle("-fx-background-color: #001a33;");
-        }
+        });
     }
 
 
@@ -146,8 +175,12 @@ public class GameController implements Initializable {
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
+        game = new Game();
+        game.generateFleet();
+
         gPlayer = playerCanvas.getGraphicsContext2D();
         gEnemy = enemyCanvas.getGraphicsContext2D();
+        boardEnemy = game.getBoard();
         board = new Board();
 
         setupBackgroundVideo();
@@ -167,6 +200,7 @@ public class GameController implements Initializable {
 
         drawGrid(gPlayer);
         drawGrid(gEnemy);
+        drawEnemyFleet();
     }
 
     private void drawGrid(GraphicsContext g) {
@@ -209,35 +243,33 @@ public class GameController implements Initializable {
     }
 
     private void placeShip(MouseEvent e) {
-        if(currentShipSize == 0) return;
+        if (currentShipSize == 0) return;
 
-        int col = (int)(e.getX() / WIDTH_CELL);
-        int row = (int)(e.getY() / HEIGHT_CELL);
+        int col = (int) (e.getX() / WIDTH_CELL);
+        int row = (int) (e.getY() / HEIGHT_CELL);
 
-        if(!fits(row,col,currentShipSize)) return;
+        if (!fits(row, col, currentShipSize)) return;
 
-        for(int i=0;i<currentShipSize;i++){
-            board.setCell(row + (vertical?i:0),col + (vertical?0:i), 1);
+        for (int i = 0; i < currentShipSize; i++) {
+            board.setCell(row + (vertical ? i : 0), col + (vertical ? 0 : i), 1);
         }
 
-        switch (currentShipSize){
+        switch (currentShipSize) {
             case 1:
-                ships.add(new Frigate(col, row, vertical? IShip.Direction.DOWN: IShip.Direction.RIGHT));
+                ships.add(new Frigate(col, row, vertical ? IShip.Direction.DOWN : IShip.Direction.RIGHT));
                 break;
             case 2:
-                ships.add(new Submarine(col, row, vertical? IShip.Direction.DOWN: IShip.Direction.RIGHT));
+                ships.add(new Destroyer(col, row, vertical ? IShip.Direction.DOWN : IShip.Direction.RIGHT));
                 break;
             case 3:
-                ships.add(new Destroyer(col, row, vertical? IShip.Direction.DOWN: IShip.Direction.RIGHT));
+                ships.add(new Submarine(col, row, vertical ? IShip.Direction.DOWN : IShip.Direction.RIGHT));
                 break;
             case 4:
-                ships.add(new AircraftCarrier(col, row, vertical? IShip.Direction.DOWN: IShip.Direction.RIGHT));
+                ships.add(new AircraftCarrier(col, row, vertical ? IShip.Direction.DOWN : IShip.Direction.RIGHT));
                 break;
             default:
                 break;
         }
-
-
 
         drawPlacedShips();
         advanceToNextShip();
@@ -262,14 +294,42 @@ public class GameController implements Initializable {
 
         gPlayer.setFill(Color.GRAY);
 
-        for(int i = 0; i < ships.size(); i++) {
-            IShip ship = ships.get(i);
+        for(IShip ship : ships) {
             int col = ship.getCol();
             int row = ship.getRow();
-            int size = ships.size();
-            IShip.Direction direction = ship.getDirection();
+            int size = ship.getShipSize();
+            IShip.Direction game_direction = ship.getDirection();
+            boolean direction = (game_direction == IShip.Direction.DOWN);
 
+            WritableImage[] images = switch (size) {
+                case 1 -> frigateSheet.getSlices(size, direction);
+                case 2 -> destroyerSheet.getSlices(size, direction);
+                case 3 -> submarineSheet.getSlices(size, direction);
+                case 4 -> carrierSheet.getSlices(size, direction);
+                default -> null;
 
+                // Get the correct sprite sheet for this ship size
+            };
+
+            System.out.println("🎨 Dibujando barco: size=" + size +
+                    " dir=" + (direction ? "VERTICAL" : "HORIZONTAL") +
+                    " pos=(" + row + "," + col + ")" +
+                    " images=" + (images != null ? images.length : "null"));
+
+            // Draw each segment of the ship
+            if (images != null) {
+                for (int j = 0; j < size; j++) {
+                    int drawCol = col + (direction ? 0 : j);
+                    int drawRow = row + (direction ? j : 0);
+
+                    System.out.println("  └─ Segmento " + j + " en (" + drawRow + "," + drawCol +
+                            ") img=" + (images[j] != null ? "✓" : "✗") +
+                            " imgSize=" + (images[j] != null ?
+                            images[j].getWidth() + "x" + images[j].getHeight() : "null"));
+
+                    boardRenderer.drawTile(gPlayer, drawCol, drawRow, images[j]);
+                }
+            }
         }
 
 /*        for(int r=0;r<SIZE;r++){
@@ -279,6 +339,59 @@ public class GameController implements Initializable {
                 }
             }
         }*/
+    }
+
+    private void drawEnemyFleet() {
+        enemyShips = game.getFleet();
+        drawEnemyShips(enemyShips);
+    }
+
+    private void drawEnemyShips(List<IShip> ships) {
+
+        for (IShip ship : ships) {
+
+            SpriteSheet sheet = switch (ship.getClass().getSimpleName()) {
+                case "AircraftCarrier" -> carrierSheet;
+                case "Destroyer" -> destroyerSheet;
+                case "Submarine" -> submarineSheet;
+                case "Frigate" -> frigateSheet;
+                default -> null;
+            };
+
+            if (sheet == null) continue;
+
+            int size = ship.getShipSize();
+            boolean vertical = (ship.getDirection() == IShip.Direction.UP ||
+                    ship.getDirection() == IShip.Direction.DOWN);
+
+            WritableImage[] slices = sheet.getSlices(size, vertical);
+
+            // Coords del barco
+            List<int[]> coords = game.getShipCoordinates(ship);
+
+            // 🔥 ORDENAR COORDENADAS 🔥
+            coords.sort((a, b) -> {
+                if (vertical) {
+                    return Integer.compare(a[0], b[0]); // fila
+                } else {
+                    return Integer.compare(a[1], b[1]); // columna
+                }
+            });
+
+            // Dibujar las piezas en orden
+            for (int i = 0; i < size; i++) {
+                int row = coords.get(i)[0];
+                int col = coords.get(i)[1];
+
+                gEnemy.drawImage(
+                        slices[i],
+                        (col - 1) * WIDTH_CELL,
+                        (row - 1) * HEIGHT_CELL,
+                        WIDTH_CELL,
+                        HEIGHT_CELL
+                );
+            }
+        }
     }
 
     private void advanceToNextShip(){
@@ -408,7 +521,39 @@ public class GameController implements Initializable {
         loadMainMenuView();
     }
 
-    public class BoardRenderer {
+    @FXML
+    private void showHelp() {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Ayuda - Batalla Naval");
+        alert.setHeaderText("📋 Cómo jugar");
+
+        String rules = """
+            Primero coloca todos los barcos (el juego avanza automáticamente al siguiente tipo):
+            
+            🚢 Flota disponible:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            1. Portaaviones:  1 unidad  —  4 casillas
+            2. Submarinos:    2 unidades — 3 casillas c/u
+            3. Destructores:  3 unidades — 2 casillas c/u
+            4. Fragatas:      4 unidades — 1 casilla c/u
+            
+            ⌨️ Controles:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            • Presiona 'R' para cambiar la orientación
+            • Click en el tablero para colocar el barco
+            
+            ⚔️ Cuando termines de colocar todos los barcos,
+            podrás comenzar a atacar al enemigo.
+            """;
+
+        alert.setContentText(rules);
+        alert.getDialogPane().setMinWidth(550);
+        alert.getDialogPane().setMinHeight(400);
+
+        alert.showAndWait();
+    }
+
+    public static class BoardRenderer {
 
         private final int WIDTH_CELL = 364/10;
         private final int HEIGHT_CELL = 301/10;
@@ -434,4 +579,10 @@ public class GameController implements Initializable {
         }
     }
 
+    //puto ignacio
+    /*private void handleBoardClick(Board enemyBoard, ImageView hitView, int row, int col){
+        game.executeHumanPlay(enemyBoard, game.getHuman(), row, col);
+    }*/
+   // board.setOnMouseClicked(event -> handleBoardClick());
+    //
 }

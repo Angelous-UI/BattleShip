@@ -88,7 +88,6 @@ Game part
  */
 
 .Back-button {
-    /* Background image */
     -fx-background-image: url('/Battleship-Images/4.png');
     -fx-background-size: cover;
     -fx-background-repeat: no-repeat;
@@ -109,6 +108,31 @@ Game part
 
 
 .Back-button:pressed {
+    -fx-translate-y: 1px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 5, 0.5, 0, 0);
+}
+
+.Help-button {
+    -fx-background-image: url('/Battleship-Images/8.png');
+    -fx-background-size: cover;
+    -fx-background-repeat: no-repeat;
+    -fx-background-position: center;
+
+
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+    -fx-text-fill: transparent;
+    -fx-cursor: hand;
+}
+
+.Help-button:hover {
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 0, 0.4), 10, 0.77, 0, 0);
+}
+
+
+.Help-button:pressed {
     -fx-translate-y: 1px;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 5, 0.5, 0, 0);
 }

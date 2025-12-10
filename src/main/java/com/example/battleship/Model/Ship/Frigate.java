@@ -1,5 +1,9 @@
 package com.example.battleship.Model.Ship;
 
+/**
+ * Frigate: a ship occupying a single cell (size = 1).
+ * Tracks hits and sunken state.
+ */
 public class Frigate implements IShip {
     private boolean sunken;
     private int hitCount;
@@ -8,6 +12,13 @@ public class Frigate implements IShip {
     private final Direction direction;
     private final int shipSize = 1;
 
+    /**
+     * Constructs a Frigate placed at (positionX, positionY) with the given direction.
+     *
+     * @param positionX 1-based column
+     * @param positionY 1-based row
+     * @param direction placement direction (unused for size=1 but kept for consistency)
+     */
     public Frigate(int positionX, int positionY, Direction direction) {
         this.positionX = positionX;
         this.positionY = positionY;
@@ -16,11 +27,16 @@ public class Frigate implements IShip {
         this.direction = direction;
     }
 
+
     @Override
     public boolean isSunken() {
         return sunken;
     }
 
+
+    /**
+     * Register a hit, mark as sunken if hit count reaches ship size.
+     */
     @Override
     public void registerHit() {
         hitCount++;
@@ -28,6 +44,7 @@ public class Frigate implements IShip {
             sunken = true;
         }
     }
+
 
     @Override
     public int getHitCount() {

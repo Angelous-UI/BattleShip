@@ -1,5 +1,9 @@
 package com.example.battleship.Model.Ship;
 
+/**
+ * AircraftCarrier: a ship occupying four cells (size = 4).
+ * Tracks registered hits and sunken state.
+ */
 public class AircraftCarrier implements IShip {
     private boolean sunken;
     private int hitCount;
@@ -8,6 +12,13 @@ public class AircraftCarrier implements IShip {
     private final Direction direction;
     private final int shipSize = 4;
 
+    /**
+     * Constructs an AircraftCarrier instance.
+     *
+     * @param positionX 1-based column
+     * @param positionY 1-based row
+     * @param direction placement direction
+     */
     public AircraftCarrier(int positionX, int positionY, Direction direction) {
         this.positionX = positionX;
         this.positionY = positionY;
@@ -16,11 +27,20 @@ public class AircraftCarrier implements IShip {
         this.direction = direction;
     }
 
+    /**
+     * Checks whether the ship has been completely destroyed.
+     *
+     * @return true if hits >= size, false otherwise
+     */
     @Override
     public boolean isSunken() {
         return sunken;
     }
 
+    /**
+     * Registers a hit on this ship.
+     * Increments the hit counter by one.
+     */
     @Override
     public void registerHit() {
         hitCount++;

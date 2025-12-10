@@ -1,5 +1,9 @@
 package com.example.battleship.Model.Ship;
 
+/**
+ * Submarine: a ship occupying three cells (size = 3).
+ * Maintains hit counting and sunken flag.
+ */
 public class Submarine implements IShip {
     private boolean sunken;
     private int hitCount;
@@ -8,6 +12,13 @@ public class Submarine implements IShip {
     private final Direction direction;
     private final int shipSize = 3;
 
+    /**
+     * Constructs a Submarine at the provided location and direction.
+     *
+     * @param positionX 1-based column
+     * @param positionY 1-based row
+     * @param direction placement direction
+     */
     public Submarine(int positionX, int positionY, Direction direction) {
         this.positionX = positionX;
         this.positionY = positionY;
