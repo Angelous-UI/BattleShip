@@ -1,4 +1,4 @@
-package com.example.miniproyecto4.Model.exceptions;
+package com.example.battleship.Model.Exceptions;
 
 public class GameLoadException extends Exception {
     public GameLoadException(String message) {

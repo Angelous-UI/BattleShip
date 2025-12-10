@@ -1,12 +1,12 @@
 package com.example.battleship.Model.Game;
 
-import com.example.battleship.Model.Coordinates.Coordinates;
-import com.example.battleship.Model.Board.Board;
-import com.example.battleship.Model.Exceptions.InvalidPositionException;
-import com.example.battleship.Model.Exceptions.InvalidShotException;
-import com.example.battleship.Model.Player.Human;
-import com.example.battleship.Model.Player.Machine;
-import com.example.battleship.Model.Ship.*;
+import com.example.miniproyecto4.Model.Coordinates.Coordinates;
+import com.example.miniproyecto4.Model.board.Board;
+import com.example.miniproyecto4.Model.exceptions.InvalidPositionException;
+import com.example.miniproyecto4.Model.exceptions.InvalidShotException;
+import com.example.miniproyecto4.Model.player.Human;
+import com.example.miniproyecto4.Model.player.Machine;
+import com.example.miniproyecto4.Model.ship.*;
 
 import java.util.*;
 
@@ -69,17 +69,18 @@ public class Game {
         applyShipToBoard(ship, d[0], d[1]);
     }
 
+    // Y también corregir calculateDisplacement
     private int[] calculateDisplacement(IShip.Direction dir) {
-        int dx = 0, dy = 0;
+        int dr = 0, dc = 0;
 
         switch (dir) {
-            case RIGHT -> dy = 1;
-            case LEFT -> dy = -1;
-            case DOWN -> dx = 1;
-            case UP -> dx = -1;
+            case RIGHT -> dc = 1;
+            case LEFT -> dc = -1;
+            case DOWN -> dr = 1;
+            case UP -> dr = -1;
         }
 
-        return new int[]{dx, dy};
+        return new int[]{dr, dc};
     }
 
     private void validateShipPlacement(IShip ship, int dx, int dy) throws InvalidPositionException {
@@ -173,24 +174,25 @@ public class Game {
     }
 
 
-    public boolean playTurn(Board board, Human player, int X, int Y){
+    // cambie en playturn, ahora coge row col
+    public boolean playTurn(Board board, Human player, int row, int col){
         // 1. Revisar si ya disparó ahí
-        if (player.alreadyShot(X, Y)) {
+        if (player.alreadyShot(row, col)) {
             System.out.println("Ya disparaste a esa posición.");
             throw new InvalidShotException("Ya disparaste a esa posición");
         }
 
         // Registrar el disparo
-        player.shoot(X, Y);
+        player.shoot(row, col);
 
-        int cell = board.getCell(Y, X);
+        int cell = board.getCell(row, col);  // Ahora es consistente
 
         if (cell == 0) {
-            board.setCell(Y, X, 2);
+            board.setCell(row, col, 2);
             System.out.println("Agua!");
         }
         else if (cell == 1) {
-            board.setCell(Y, X, 3);
+            board.setCell(row, col, 3);
             System.out.println("¡Impacto!");
 
             for (IShip ship : fleet) {
@@ -205,30 +207,31 @@ public class Game {
         return false;
     }
 
+
+    // cambios asi tmb
     public Boolean ValidateShot(Human player, IShip ship){
         for (int[] shot : player.getShots()) {
+            int shotRow = shot[0];  // fila
+            int shotCol = shot[1];  // columna
 
-            int shotX = shot[0];
-            int shotY = shot[1];
+            int shipRow = ship.getRow();
+            int shipCol = ship.getCol();
 
-            int x = ship.getCol();
-            int y = ship.getRow();
-
-            int dx = 0, dy = 0;
+            int dr = 0, dc = 0;  // delta row, delta col
 
             switch (ship.getDirection()) {
-                case RIGHT -> dy = 1;
-                case LEFT -> dy = -1;
-                case DOWN -> dx = 1;
-                case UP -> dx = -1;
+                case RIGHT -> dc = 1;   // RIGHT mueve en columnas
+                case LEFT -> dc = -1;
+                case DOWN -> dr = 1;    // DOWN mueve en filas
+                case UP -> dr = -1;
             }
 
             for (int i = 0; i < ship.getShipSize(); i++) {
-                int bx = x + dx * i;
-                int by = y + dy * i;
+                int currentRow = shipRow + dr * i;
+                int currentCol = shipCol + dc * i;
 
-                if (shotX == bx && shotY == by) {
-                    ship.isTouched();
+                if (shotRow == currentRow && shotCol == currentCol) {
+                    ship.registerHit();
                     return true;
                 }
             }
@@ -237,37 +240,37 @@ public class Game {
         return false;
     }
 
-    public void executeHumanPlay(Board board, Human human, int X, int Y){
+    // cambio asi tmb
+    public void executeHumanPlay(Board board, Human human, int row, int col){
+        boolean successfulShot = playTurn(board, human, row, col);
 
-        boolean SuscesfullShot = playTurn(board, human, X, Y);
-
-        if (!SuscesfullShot) {
+        if (!successfulShot) {
             System.out.println("Fin del turno del jugador.");
             advanceTurn();
         }
-
     }
 
+    // cambio asi tmb
     public List<int[]> getShipCoordinates(IShip ship) {
         List<int[]> coords = new ArrayList<>();
 
-        int row = ship.getRow();   // fila
-        int col = ship.getCol();   // columna
+        int row = ship.getRow();
+        int col = ship.getCol();
         int size = ship.getShipSize();
 
-        int dx = 0, dy = 0;
+        int dr = 0, dc = 0;
 
         switch (ship.getDirection()) {
-            case RIGHT -> dx = 1;
-            case LEFT  -> dx = -1;
-            case DOWN  -> dy = 1;
-            case UP    -> dy = -1;
+            case RIGHT -> dc = 1;
+            case LEFT  -> dc = -1;
+            case DOWN  -> dr = 1;
+            case UP    -> dr = -1;
         }
 
         for (int i = 0; i < size; i++) {
-            int x = col + dx * i;  // columna
-            int y = row + dy * i;  // fila
-            coords.add(new int[]{x, y});
+            int currentRow = row + dr * i;
+            int currentCol = col + dc * i;
+            coords.add(new int[]{currentRow, currentCol});  // [row, col]
         }
 
         return coords;
@@ -279,7 +282,11 @@ public class Game {
             System.out.println("--- " + ship.getClass().getSimpleName() + " ---");
 
             for (int[] c : getShipCoordinates(ship)) {
-                System.out.println("X=" + c[0] + "  Y=" + c[1]);
+                // c[0] = row (fila) = Y
+                // c[1] = col (columna) = X
+                System.out.println("Fila=" + c[0] + "  Col=" + c[1]);
+                // O si prefieres mantener X/Y:
+                // System.out.println("Y=" + c[0] + "  X=" + c[1]);
             }
             System.out.println();
         }

@@ -13,9 +13,10 @@ public interface IShip {
     }
 
     boolean isSunken();
-    boolean isTouched();
+    void registerHit();
     int getRow();
     int getCol();
     int getShipSize();
     Direction getDirection();
+    int getHitCount(); //Cuántos impatos tienen
 }
