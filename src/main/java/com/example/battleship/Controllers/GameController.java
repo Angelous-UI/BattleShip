@@ -76,7 +76,6 @@ public class GameController implements Initializable {
             WIDTH_CELL, HEIGHT_CELL
     );
 
-
     private SpriteSheet submarineSheet = new SpriteSheet(
             getClass().getResource("/sprites/submarine.png").toExternalForm(),
             WIDTH_CELL, HEIGHT_CELL
