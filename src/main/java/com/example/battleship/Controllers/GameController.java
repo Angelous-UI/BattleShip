@@ -200,6 +200,7 @@ public class GameController implements Initializable {
 
         drawGrid(gPlayer);
         drawGrid(gEnemy);
+        enemyCanvas.setOnMouseClicked(this::onEnemyClick);
         drawEnemyFleet();
     }
 
@@ -580,9 +581,20 @@ public class GameController implements Initializable {
     }
 
     //puto ignacio
-    /*private void handleBoardClick(Board enemyBoard, ImageView hitView, int row, int col){
+    private void handleBoardClick(Board enemyBoard, ImageView hitView, int row, int col){
         game.executeHumanPlay(enemyBoard, game.getHuman(), row, col);
-    }*/
-   // board.setOnMouseClicked(event -> handleBoardClick());
-    //
+    }
+
+    private void onEnemyClick(MouseEvent event) {
+        int col = (int)(event.getX() / WIDTH_CELL);
+        int row = (int)(event.getY() / HEIGHT_CELL);
+
+        int boardRow = row + 1;
+        int boardCol = col + 1;
+
+        System.out.println("🎯 Click en enemigo: row=" + boardRow + " col=" + boardCol);
+
+        handleBoardClick(boardEnemy, null, boardRow, boardCol);
+    }
+
 }

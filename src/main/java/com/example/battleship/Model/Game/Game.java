@@ -25,6 +25,7 @@ public class Game implements IGame {
      * Human player instance.
      */
     private Human human;
+    private Machine machine;
     /**
      * Stores all active players (human and CPU).
      */
@@ -36,7 +37,7 @@ public class Game implements IGame {
     /**
      * List containing every ship currently placed in the game.
      */
-    private List<IShip> fleet = new ArrayList<>();
+    private final List<IShip> fleet = new ArrayList<>();
     /**
      * Current turn index for the active player list.
      */
@@ -49,6 +50,7 @@ public class Game implements IGame {
      * Main game board where ships and shots are stored.
      */
     private final Board board;
+    private final Board playerBoard;
 
     /**
      * Creates a new game instance and initializes players and the board.
@@ -57,6 +59,7 @@ public class Game implements IGame {
         this.players = new ArrayList<>();
         this.turnQueue = new LinkedList<>();
         this.board = new Board();
+        this.playerBoard = new Board();
         initializePlayers();
     }
 
@@ -69,7 +72,7 @@ public class Game implements IGame {
         players.add(human);
         turnQueue.add(human);
 
-        Machine machine = new Machine("CPU-");
+        machine = new Machine("CPU-");
         players.add(machine);
         turnQueue.add(machine);
     }
@@ -315,7 +318,7 @@ public class Game implements IGame {
         }
 
         if (isShip(cell)) {
-            return handleShipHit(board, player, row, col);
+            return handleShipHit(board, row, col);
         }
 
         return false;
@@ -385,44 +388,42 @@ public class Game implements IGame {
      * Handles a shot that hits a ship.
      *
      * @param board  game board
-     * @param player the shooting player
      * @param row    target row
      * @param col    target column
      * @return {@code true} if the player can shoot again
      */
-    private boolean handleShipHit(Board board, Human player, int row, int col) {
+    private boolean handleShipHit(Board board, int row, int col) {
         board.setCell(row, col, 3);
         System.out.println("¡Impacto!");
 
         for (IShip ship : fleet) {
-            if (ValidateShot(player, ship)) {
+            if (ValidateShot(row, col, ship)) {
                 if (ship.isSunken()) {
                     System.out.println("🔥 Hundiste un " + ship.getClass().getSimpleName());
                 }
-                return true; // puede seguir disparando
+                return true;
             }
         }
 
         return false;
     }
-
 
     /**
      * Validates if the player’s recorded shots intersect a given ship.
      *
-     * @param player the player
+     * @param row the row
+     * @param col the col
      * @param ship   the ship being validated
      * @return {@code true} if the ship was hit
      */
-    public Boolean ValidateShot(Human player, IShip ship) {
-        for (int[] shot : player.getShots()) {
-            if (isShotInsideShip(shot[0], shot[1], ship)) {
-                ship.registerHit();
-                return true;
-            }
+    public boolean ValidateShot(int row, int col, IShip ship) {
+        if (isShotInsideShip(row, col, ship)) {
+            ship.registerHit();
+            return true;
         }
         return false;
     }
+
 
     /**
      * Determines if a shot coordinate lies within a ship’s coordinates.
@@ -502,6 +503,11 @@ public class Game implements IGame {
             System.out.println("Fin del turno del jugador.");
             advanceTurn();
         }
+    }
+
+    public void executeMachinePlay(){
+
+        advanceTurn();
     }
 
     /**
