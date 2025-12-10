@@ -1,5 +1,8 @@
 package com.example.battleship.Controllers;
 
+import com.example.battleship.Model.Board.Board;
+import com.example.battleship.Model.Ship.*;
+import com.example.battleship.Model.Utils.SpriteSheet;
 import com.example.battleship.Views.GameView;
 import com.example.battleship.Views.MainMenuView;
 import javafx.animation.KeyFrame;
@@ -12,6 +15,9 @@ import javafx.fxml.Initializable;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
+import javafx.scene.image.Image;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
@@ -23,10 +29,10 @@ import javafx.util.Duration;
 
 
 import java.net.URL;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
-import java.util.ResourceBundle;
+import java.util.*;
+
+import static com.example.battleship.Model.Ship.IShip.Direction.DOWN;
+import static com.example.battleship.Model.Ship.IShip.Direction.RIGHT;
 
 public class GameController implements Initializable {
 
@@ -36,13 +42,51 @@ public class GameController implements Initializable {
     @FXML
     private Button GoBackButton;
 
-    @FXML
-    private Canvas canvas;
+    @FXML private Canvas playerCanvas;
+    @FXML private Canvas enemyCanvas;
+
+    private GraphicsContext gPlayer;
+    private GraphicsContext gEnemy;
 
     private MediaPlayer mediaPlayer;
     private Stage stage;
 
-    Map<String, Boolean> board = new HashMap<>();
+    private final int WIDTH_CELL = 364/10;
+    private final int HEIGHT_CELL = 301/10;
+
+    private final int SIZE = 10;
+
+    private int currentShipSize = 4;   // Comenzamos con portaaviones
+    private boolean vertical = false;
+
+    private Board board;
+    private Stack<IShip> ships = new Stack<>();
+
+    // ================= FLEET ORDER =================
+    private int[] fleet = {4,3,3,2,2,2,1,1,1,1};
+    private int shipIndex = 0;
+
+    private SpriteSheet carrierSheet = new SpriteSheet(
+            getClass().getResource("/sprites/carrier.png").toExternalForm(),
+            WIDTH_CELL, HEIGHT_CELL
+    );
+
+    private SpriteSheet battleshipSheet = new SpriteSheet(
+            getClass().getResource("/sprites/battleship.png").toExternalForm(),
+            WIDTH_CELL, HEIGHT_CELL
+    );
+
+
+    private SpriteSheet submarineSheet = new SpriteSheet(
+            getClass().getResource("/sprites/submarine.png").toExternalForm(),
+            WIDTH_CELL, HEIGHT_CELL
+    );
+
+    private SpriteSheet destroyerSheet = new SpriteSheet(
+            getClass().getResource("/sprites/destroyer.png").toExternalForm(),
+            WIDTH_CELL, HEIGHT_CELL
+    );
+
 
     public void setStage(Stage stage) {
         this.stage = stage;
@@ -103,8 +147,155 @@ public class GameController implements Initializable {
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
+        gPlayer = playerCanvas.getGraphicsContext2D();
+        gEnemy = enemyCanvas.getGraphicsContext2D();
+        board = new Board();
+
         setupBackgroundVideo();
         addExplosionEffect(GoBackButton);
+
+        playerCanvas.setOnMouseMoved(this::previewShip);
+        playerCanvas.setOnMouseClicked(this::placeShip);
+        playerCanvas.setOnMouseExited(e -> drawPlacedShips());
+
+        playerCanvas.setFocusTraversable(true);
+        playerCanvas.setOnKeyPressed(ke -> {
+            if (ke.getCode() == KeyCode.R || ke.getCode() == KeyCode.SPACE) {
+                vertical = !vertical;
+                drawPlacedShips();
+            }
+        });
+
+        drawGrid(gPlayer);
+        drawGrid(gEnemy);
+    }
+
+    private void drawGrid(GraphicsContext g) {
+        g.setFill(Color.web("TRANSPARENT"));
+        g.fillRect(0,0,364,301);
+
+        g.setStroke(Color.rgb(255,255,255,0.3));
+        g.setLineWidth(1);
+
+        // Vertical Lines
+        for (int i = 0; i <= SIZE; i++) {
+            g.strokeLine(i*WIDTH_CELL, 0, i*WIDTH_CELL, 301);
+        }
+
+        // Horizontal Lines
+        for (int i = 0; i <= SIZE; i++) {
+            g.strokeLine(0, i*HEIGHT_CELL, 364, i*HEIGHT_CELL);
+        }
+    }
+
+    private void previewShip(MouseEvent e) {
+        drawPlacedShips();
+
+        if(currentShipSize == 0) return;
+
+        int col = (int)(e.getX() / WIDTH_CELL);
+        int row = (int)(e.getY() / HEIGHT_CELL);
+
+        // Validar si cabe antes de pintar
+        if(!fits(row,col,currentShipSize)) return;
+
+        gPlayer.setFill(Color.rgb(0,255,255,0.35));
+        for(int i=0;i<currentShipSize;i++){
+            gPlayer.fillRect(
+                    col * WIDTH_CELL + (vertical?0:i*WIDTH_CELL),
+                    row * HEIGHT_CELL + (vertical?i*HEIGHT_CELL:0),
+                    WIDTH_CELL, HEIGHT_CELL
+            );
+        }
+    }
+
+    private void placeShip(MouseEvent e) {
+        if(currentShipSize == 0) return;
+
+        int col = (int)(e.getX() / WIDTH_CELL);
+        int row = (int)(e.getY() / HEIGHT_CELL);
+
+        if(!fits(row,col,currentShipSize)) return;
+
+        for(int i=0;i<currentShipSize;i++){
+            board.setCell(row + (vertical?i:0),col + (vertical?0:i), 1);
+        }
+
+        switch (currentShipSize){
+            case 1:
+                ships.add(new Frigate(col, row, vertical? IShip.Direction.DOWN: IShip.Direction.RIGHT));
+                break;
+            case 2:
+                ships.add(new Submarine(col, row, vertical? IShip.Direction.DOWN: IShip.Direction.RIGHT));
+                break;
+            case 3:
+                ships.add(new Destroyer(col, row, vertical? IShip.Direction.DOWN: IShip.Direction.RIGHT));
+                break;
+            case 4:
+                ships.add(new AircraftCarrier(col, row, vertical? IShip.Direction.DOWN: IShip.Direction.RIGHT));
+                break;
+            default:
+                break;
+        }
+
+
+
+        drawPlacedShips();
+        advanceToNextShip();
+    }
+
+    private boolean fits(int row,int col,int size){
+        for(int i=0;i<size;i++){
+            int r = row + (vertical?i:0);
+            int c = col + (vertical?0:i);
+
+            if(r>=SIZE || c>=SIZE) return false;       // se sale
+            if(board.getCell(r,c) == 1) return false;           // choca con otro
+        }
+        return true;
+    }
+
+    private void drawPlacedShips(){
+
+        gPlayer.clearRect(0, 0, playerCanvas.getWidth(), playerCanvas.getHeight());
+
+        drawGrid(gPlayer);
+
+        gPlayer.setFill(Color.GRAY);
+
+        for(int i = 0; i < ships.size(); i++) {
+            IShip ship = ships.get(i);
+            int col = ship.getCol();
+            int row = ship.getRow();
+            int size = ships.size();
+            IShip.Direction direction = ship.getDirection();
+
+
+        }
+
+/*        for(int r=0;r<SIZE;r++){
+            for(int c=0;c<SIZE;c++){
+                if(board.getCell(r,c) == 1){
+                    gPlayer.fillRect(c*WIDTH_CELL,r*HEIGHT_CELL,WIDTH_CELL,HEIGHT_CELL);
+                }
+            }
+        }*/
+    }
+
+    private void advanceToNextShip(){
+        shipIndex++;
+
+        if(shipIndex >= fleet.length) {
+            currentShipSize = 0; // señal de "sin barcos"
+            playerCanvas.setOnMouseMoved(null);
+            playerCanvas.setOnMouseClicked(null);
+            System.out.println("🚢 Fleet");
+            return;
+        }
+
+        // actualizar tamaño del próximo barco
+        currentShipSize = fleet[shipIndex];
+        System.out.println("Coloca el próximo barco (tamaño " + currentShipSize + ")");
     }
 
     private void addExplosionEffect(Button button) {
@@ -217,4 +408,31 @@ public class GameController implements Initializable {
         System.out.println("Go back to main menu...");
         loadMainMenuView();
     }
+
+    public class BoardRenderer {
+
+        private final int WIDTH_CELL = 364/10;
+        private final int HEIGHT_CELL = 301/10;
+
+        public void drawTile(GraphicsContext g, int x, int y, Image img){
+            g.drawImage(img, x * WIDTH_CELL, y * HEIGHT_CELL, WIDTH_CELL, HEIGHT_CELL);
+        }
+
+        public void drawSplash(GraphicsContext g, int x, int y){
+            g.setStroke(javafx.scene.paint.Color.CYAN);
+            g.strokeLine(x* WIDTH_CELL, y* HEIGHT_CELL, (x+1)*WIDTH_CELL, (y+1)*HEIGHT_CELL);
+            g.strokeLine((x+1)*WIDTH_CELL, y*HEIGHT_CELL, x*WIDTH_CELL, (y+1)*HEIGHT_CELL);
+        }
+
+        public void drawHit(GraphicsContext g, int x, int y){
+            g.setFill(javafx.scene.paint.Color.rgb(255,0,0,0.6));
+            g.fillOval(x*WIDTH_CELL+5, y*HEIGHT_CELL+5, WIDTH_CELL-10, HEIGHT_CELL-10);
+        }
+
+        public void drawSunk(GraphicsContext g, int x, int y){
+            g.setFill(javafx.scene.paint.Color.rgb(150,0,0,0.9));
+            g.fillRect(x*WIDTH_CELL, y*HEIGHT_CELL, WIDTH_CELL, HEIGHT_CELL);
+        }
+    }
+
 }
