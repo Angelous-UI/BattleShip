@@ -19,6 +19,10 @@ import java.net.URL;
 import java.util.Random;
 import java.util.ResourceBundle;
 
+/**
+ * controller for the main menu view
+ * Handles ui interactions, button animations, explosion effects and background video playback in the main menu
+ */
 public class MainMenuController implements Initializable {
 
     @FXML
@@ -39,6 +43,10 @@ public class MainMenuController implements Initializable {
     private MediaPlayer mediaPlayer;
     private Stage stage;
 
+    /**
+     * Initializes the main menu, setting up the background video
+     * and button explosion animations.
+     */
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
         setupBackgroundVideo();
@@ -47,6 +55,11 @@ public class MainMenuController implements Initializable {
         addExplosionEffect(exitButton);
     }
 
+    /**
+     * Adds a click-triggered explosion animation and button shake effect.
+     *
+     * @param button the button to attach the effects to
+     */
     private void addExplosionEffect(Button button) {
         button.setOnMouseClicked(event -> {
             event.consume();
@@ -71,6 +84,12 @@ public class MainMenuController implements Initializable {
         });
     }
 
+    /**
+     * Creates a particle-based explosion animation at the given coordinates.
+     *
+     * @param x the x-coordinate of the explosion center
+     * @param y the y-coordinate of the explosion center
+     */
     private void createExplosion(double x, double y) {
         Random random = new Random();
         int particleCount = 30;
@@ -108,6 +127,11 @@ public class MainMenuController implements Initializable {
         }
     }
 
+    /**
+     * Applies a shaking animation to the specified button.
+     *
+     * @param button the button to shake
+     */
     private void shakeButton(Button button) {
         Timeline shake = new Timeline(
                 new KeyFrame(Duration.ZERO,
@@ -134,10 +158,19 @@ public class MainMenuController implements Initializable {
         shake.play();
     }
 
+    /**
+     * Links the controller to the main application window.
+     *
+     * @param stage the main stage
+     */
     public void setStage(Stage stage) {
         this.stage = stage;
     }
 
+    /**
+     * Loads and starts playing the looping background video.
+     * Handles video recreation, resizing, and error recovery.
+     */
     private void setupBackgroundVideo() {
         Platform.runLater(() -> {
             try {
@@ -202,6 +235,9 @@ public class MainMenuController implements Initializable {
         });
     }
 
+    /**
+     * Closes the main menu and loads the game view.
+     */
     private void loadGameView() {
         try {
             if (mediaPlayer != null) {
@@ -212,18 +248,21 @@ public class MainMenuController implements Initializable {
 
             System.gc(); // fuerza la limpieza
 
-            GameView gameView = new GameView();
+            GameView.deleteInstance(); // Borramos instancia previa, pues si es que hay bro
+            GameView gameView = GameView.getInstance();
 
             Stage currentStage = (Stage) playButton.getScene().getWindow();
             currentStage.close();
-
-            gameView.show();
 
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * Handles the "New Game" action.
+     * Stops video playback and loads the game.
+     */
     @FXML
     private void onNewGame() {
         stopVideo();
@@ -231,18 +270,29 @@ public class MainMenuController implements Initializable {
         loadGameView();
     }
 
+    /**
+     * Handles the "Continue" button action.
+     * Currently only prints debug info.
+     */
     @FXML
     private void onContinue() {
         stopVideo();
         System.out.println("Loading Game...");
     }
 
+    /**
+     * Handles the "Exit" button action.
+     * Stops video playback and exits the application.
+     */
     @FXML
     private void onExit() {
         stopVideo();
         System.exit(0);
     }
 
+    /**
+     * Stops and disposes of the background video.
+     */
     public void stopVideo() {
         if (mediaPlayer != null) {
             mediaPlayer.stop();

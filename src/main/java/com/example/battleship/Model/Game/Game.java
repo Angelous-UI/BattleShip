@@ -1,5 +1,6 @@
 package com.example.battleship.Model.Game;
 
+import com.example.battleship.Model.AI.SmartAI;
 import com.example.battleship.Model.Coordinates.Coordinates;
 import com.example.battleship.Model.Board.Board;
 import com.example.battleship.Model.Exceptions.InvalidGameStateException;
@@ -35,9 +36,10 @@ public class Game implements IGame {
      */
     private final Queue<Object> turnQueue;
     /**
-     * List containing every ship currently placed in the game.
+     * List containing every ship currently placed in the machine board.
      */
-    private final List<IShip> fleet = new ArrayList<>();
+    private final List<IShip> machineFleet = new ArrayList<>();
+    private final List<IShip> humanFleet = new ArrayList<>();
     /**
      * Current turn index for the active player list.
      */
@@ -49,8 +51,28 @@ public class Game implements IGame {
     /**
      * Main game board where ships and shots are stored.
      */
-    private final Board board;
-    private final Board playerBoard;
+    private final Board machineBoard;
+    private final Board humanBoard;
+    private GameState currentState;
+
+    private final Set<String> humanShots = new HashSet<>();
+    private final Set<String> machineShots = new HashSet<>();
+
+    private final SmartAI smartAI = new SmartAI();
+
+    public enum GameState {
+        SETUP,
+        PLAYING,
+        FINISHED
+    }
+
+    public enum ShotResult {
+        MISS,
+        HIT,
+        SUNK,
+        ALREADY_SHOT,
+        INVALID
+    }
 
     /**
      * Creates a new game instance and initializes players and the board.
@@ -58,15 +80,17 @@ public class Game implements IGame {
     public Game() {
         this.players = new ArrayList<>();
         this.turnQueue = new LinkedList<>();
-        this.board = new Board();
-        this.playerBoard = new Board();
+        this.machineBoard = new Board();
+        this.humanBoard = new Board();
+        this.currentState = GameState.SETUP;
         initializePlayers();
+
+
     }
 
     /**
      * Initializes the human and machine players and adds them to the turn queue.
      */
-
     private void initializePlayers() {
         human = new Human("You");
         players.add(human);
@@ -77,6 +101,22 @@ public class Game implements IGame {
         turnQueue.add(machine);
     }
 
+    public void startGame() {
+        if (humanFleet.isEmpty()) {
+            throw new InvalidGameStateException("Player must place their ships first.");
+        }
+        currentState = GameState.PLAYING;
+        currentPlayerIndex = 0;
+    }
+
+    public boolean isHumanTurn() {
+        return getCurrentPlayer() == human;
+    }
+
+    public boolean isMachineTurn() {
+        return getCurrentPlayer() == machine;
+    }
+
     /**
      * Returns the player whose turn is currently active.
      *
@@ -85,15 +125,8 @@ public class Game implements IGame {
     @Override
     public Object getCurrentPlayer() {
         List<Object> activePlayers = getActivePlayers();
-
-        if (activePlayers.isEmpty()) {
-            return null;
-        }
-
-        if (currentPlayerIndex >= activePlayers.size()) {
-            currentPlayerIndex = 0;
-        }
-
+        if (activePlayers.isEmpty()) { return null; }
+        if (currentPlayerIndex >= activePlayers.size()) { currentPlayerIndex = 0; }
         return activePlayers.get(currentPlayerIndex);
     }
 
@@ -120,18 +153,52 @@ public class Game implements IGame {
         }
     }
 
-    /**
-     * Attempts to place a ship on the board. Validates boundaries and collisions.
-     *
-     * @param ship the ship to be placed
-     * @throws InvalidPositionException if the ship overlaps or goes out of bounds
-     */
-    public void placeShip(IShip ship) throws InvalidPositionException {
+    // ================= SHIPS ACCOMMODATION =================
+    public void placeHumanShip(IShip ship) throws InvalidPositionException {
         int[] d = calculateDisplacement(ship.getDirection());
-        validateShipPlacement(ship, d[0], d[1]);
-        applyShipToBoard(ship, d[0], d[1]);
+        validateShipPlacement(ship, d[0], d[1], humanBoard);
+        applyShipToBoard(ship, d[0], d[1], humanBoard);
+        humanFleet.add(ship);
     }
 
+    /**
+     * Ensures the ship can be placed without leaving the board or colliding.
+     *
+     * @param ship the ship to validate
+     * @param dx   row displacement
+     * @param dy   column displacement
+     * @throws InvalidPositionException if placement is invalid
+     */
+    private void validateShipPlacement(IShip ship, int dx, int dy, Board board) throws InvalidPositionException {
+        int row = ship.getRow();
+        int col = ship.getCol();
+        int size = ship.getShipSize();
+
+        for (int i = 0; i < size; i++) {
+            int r = row + dx * i;
+            int c = col + dy * i;
+
+            if (r < 0 || r >= 10 || c < 0 || c >= 10) {
+                throw new InvalidPositionException("Fuera de límites");
+            }
+
+            if (board.getCell(r, c) == 1) {
+                throw new InvalidPositionException("Colisión con otro barco");
+            }
+        }
+    }
+
+    private void applyShipToBoard(IShip ship, int dx, int dy, Board board) {
+        int row = ship.getRow();
+        int col = ship.getCol();
+        int size = ship.getShipSize();
+
+        for (int i = 0; i < size; i++) {
+            int r = row + dx * i;
+            int c = col + dy * i;
+            board.setCell(r, c, 1);
+        }
+    }
 
     /**
      * Converts the ship direction into row/column displacement values.
@@ -139,7 +206,6 @@ public class Game implements IGame {
      * @param dir the direction of the ship
      * @return an array containing vertical and horizontal displacement
      */
-    // Y también corregir calculateDisplacement
     private int[] calculateDisplacement(IShip.Direction dir) {
         int dr = 0, dc = 0;
 
@@ -154,14 +220,19 @@ public class Game implements IGame {
     }
 
     /**
-     * Ensures the ship can be placed without leaving the board or colliding.
+     * Attempts to place a ship on the board. Validates boundaries and collisions.
      *
-     * @param ship the ship to validate
-     * @param dx   row displacement
-     * @param dy   column displacement
-     * @throws InvalidPositionException if placement is invalid
+     * @param ship the ship to be placed
+     * @throws InvalidPositionException if the ship overlaps or goes out of bounds
      */
-    private void validateShipPlacement(IShip ship, int dx, int dy) throws InvalidPositionException {
+    public void placeShip(IShip ship) throws InvalidPositionException {
+        int[] d = calculateDisplacement(ship.getDirection());
+        validateShipPlacement(ship, d[0], d[1], machineBoard);
+        applyShipToBoard(ship, d[0], d[1], machineBoard);
+    }
+
+
+/*    private void validateShipPlacement(IShip ship, int dx, int dy) throws InvalidPositionException {
         int row = ship.getRow();
         int col = ship.getCol();
         int size = ship.getShipSize();
@@ -173,29 +244,11 @@ public class Game implements IGame {
             if (r < 1 || r > 10 || c < 1 || c > 10)
                 throw new InvalidPositionException("No valid position");
 
-            if (board.getCell(r, c) == 1)
+            if (machineBoard.getCell(r, c) == 1)
                 throw new InvalidPositionException("Ship collision");
         }
-    }
+    }*/
 
-    /**
-     * Places the ship on the board by marking its cells as ship positions.
-     *
-     * @param ship the ship to place
-     * @param dx   row displacement
-     * @param dy   column displacement
-     */
-    private void applyShipToBoard(IShip ship, int dx, int dy) {
-        int row = ship.getRow();
-        int col = ship.getCol();
-        int size = ship.getShipSize();
-
-        for (int i = 0; i < size; i++) {
-            int r = row + dx * i;
-            int c = col + dy * i;
-            board.setCell(r, c, 1);
-        }
-    }
     /**
      * Generates the full fleet for the game using random coordinates.
      * Automatically places each ship type based on predefined quantities.
@@ -248,7 +301,7 @@ public class Game implements IGame {
 
             try {
                 placeShip(ship);
-                fleet.add(ship);
+                machineFleet.add(ship);
                 return true;
             } catch (InvalidPositionException ignored) {}
         }
@@ -291,7 +344,221 @@ public class Game implements IGame {
         };
     }
 
+    // =============== FIRING SYSTEM =======================
+    /**
+     * Ejecuta el disparo del jugador humano
+     */
+    public ShotResult executeHumanShot(int row, int col) {
+        if (!isHumanTurn()) {
+            throw new InvalidGameStateException("No es tu turno");
+        }
 
+        if (currentState != GameState.PLAYING) {
+            throw new InvalidGameStateException("El juego no ha comenzado");
+        }
+
+        // ✅ Validar rango 0-9
+        if (row < 0 || row >= 10 || col < 0 || col >= 10) {
+            return ShotResult.INVALID;
+        }
+
+        String key = row + "," + col;
+        if (humanShots.contains(key)) {
+            return ShotResult.ALREADY_SHOT;
+        }
+
+        humanShots.add(key);
+        return processShot(row, col, machineBoard, machineFleet);
+    }
+
+    /**
+     * Ejecuta el disparo de la máquina
+     * @return [row (0-9), col (0-9), result.ordinal()]
+     */
+    public int[] executeMachineShot() {
+        if (!isMachineTurn()) {
+            throw new InvalidGameStateException("No es turno de la máquina");
+        }
+
+        Random rand = new Random();
+        int row, col;
+
+        do {
+            row = rand.nextInt(10); // 0-9
+            col = rand.nextInt(10); // 0-9
+        } while (machineShots.contains(row + "," + col));
+
+        machineShots.add(row + "," + col);
+
+        // El humanBoard usa 0-9
+        ShotResult result = processShot(row, col, humanBoard, humanFleet);
+
+        return new int[]{row, col, result.ordinal()};
+    }
+
+    /**
+     * Procesa un disparo en un tablero
+     * @param row fila (puede ser 0-9 o 1-10 dependiendo del tablero)
+     * @param col columna (puede ser 0-9 o 1-10 dependiendo del tablero)
+     */
+    private ShotResult processShot(int row, int col, Board board, List<IShip> fleet) {
+        int cell = board.getCell(row, col);
+
+        if (cell == 0) {
+            board.setCell(row, col, 2);
+            System.out.println("💦 Agua en (" + row + "," + col + ")");
+            return ShotResult.MISS;
+        } else if (cell == 1) {
+            board.setCell(row, col, 3);
+            System.out.println("💥 Impacto en (" + row + "," + col + ")");
+
+            // Buscar el barco impactado
+            for (IShip ship : fleet) {
+                if (isShotInsideShip(row, col, ship)) {
+                    ship.registerHit();
+
+                    if (ship.isSunken()) {
+                        System.out.println("🔥 Barco hundido: " + ship.getClass().getSimpleName());
+                        checkGameOver();
+                        return ShotResult.SUNK;
+                    }
+                    return ShotResult.HIT;
+                }
+            }
+            return ShotResult.HIT;
+        }
+
+        return ShotResult.ALREADY_SHOT;
+    }
+
+    /**
+     * Determines if a shot coordinate lies within a ship’s coordinates.
+     *
+     * @param shotRow shot row
+     * @param shotCol shot column
+     * @param ship    target ship
+     * @return {@code true} if the shot hits the ship
+     */
+    private boolean isShotInsideShip(int shotRow, int shotCol, IShip ship) {
+        int dr = calculateDeltaRow(ship);
+        int dc = calculateDeltaCol(ship);
+        int baseRow = ship.getRow();
+        int baseCol = ship.getCol();
+
+        for (int i = 0; i < ship.getShipSize(); i++) {
+            int currentRow = baseRow + dr * i;
+            int currentCol = baseCol + dc * i;
+            if (shotRow == currentRow && shotCol == currentCol) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Determines the row increment based on ship direction.
+     *
+     * @param ship the ship
+     * @return row displacement
+     */
+    private int calculateDeltaRow(IShip ship) {
+        return switch (ship.getDirection()) {
+            case DOWN -> 1;
+            case UP -> -1;
+            default -> 0;
+        };
+    }
+
+    /**
+     * Determines the column increment based on ship direction.
+     *
+     * @param ship the ship
+     * @return column displacement
+     */
+    private int calculateDeltaCol(IShip ship) {
+        return switch (ship.getDirection()) {
+            case RIGHT -> 1;
+            case LEFT -> -1;
+            default -> 0;
+        };
+    }
+
+    //================== GAME OVER VERIFICATION ==================
+
+    private void checkGameOver() {
+        long humanShipsSunk = humanFleet.stream().filter(IShip::isSunken).count();
+        long machineShipsSunk = machineFleet.stream().filter(IShip::isSunken).count();
+
+        if (humanShipsSunk == humanFleet.size()) {
+            gameOver = true;
+            currentState = GameState.FINISHED;
+        } else if (machineShipsSunk == machineFleet.size()) {
+            gameOver = true;
+            currentState = GameState.FINISHED;
+        }
+    }
+
+    public boolean hasHumanWon() {
+        return machineFleet.stream().allMatch(IShip::isSunken);
+    }
+
+    public boolean hasMachineWon() {
+        return humanFleet.stream().allMatch(IShip::isSunken);
+    }
+
+    //================= ACCESS METHODS =======================
+
+    /**
+     * Retrieves all the board coordinates occupied by a specific ship.
+     *
+     * @param ship the ship to inspect
+     * @return a list of coordinates representing the ship
+     */
+    public List<int[]> getShipCoordinates(IShip ship) {
+        List<int[]> coords = new ArrayList<>();
+
+        int row = ship.getRow();
+        int col = ship.getCol();
+        int size = ship.getShipSize();
+
+        int dr = 0, dc = 0;
+
+        switch (ship.getDirection()) {
+            case RIGHT -> dc = 1;
+            case LEFT  -> dc = -1;
+            case DOWN  -> dr = 1;
+            case UP    -> dr = -1;
+        }
+
+        for (int i = 0; i < size; i++) {
+            int currentRow = row + dr * i;
+            int currentCol = col + dc * i;
+            coords.add(new int[]{currentRow, currentCol});  // [row, col]
+        }
+
+        return coords;
+    }
+
+    /**
+     * Prints the coordinates of all ships currently placed in the fleet.
+     */
+    @Override
+    public void printFleetCoordinates() {
+        for (IShip ship : machineFleet) {
+            System.out.println("--- " + ship.getClass().getSimpleName() + " ---");
+
+            for (int[] c : getShipCoordinates(ship)) {
+                // c[0] = row (fila) = Y
+                // c[1] = col (columna) = X
+                System.out.println("Fila=" + c[0] + "  Col=" + c[1]);
+                // O si prefieres mantener X/Y:
+                // System.out.println("Y=" + c[0] + "  X=" + c[1]);
+            }
+            System.out.println();
+        }
+    }
+
+    //================ OTHER FUNCTIONS =====================
 
     /**
      * Executes the player's turn by firing at a coordinate.
@@ -303,7 +570,6 @@ public class Game implements IGame {
      * @return {@code true} if the shot hits a ship
      * @throws InvalidShotException if the player shoots the same cell twice
      */
-    // cambie en playturn, ahora coge row col
     @Override
     public boolean playTurn(Board board, Human player, int row, int col) {
 
@@ -396,7 +662,7 @@ public class Game implements IGame {
         board.setCell(row, col, 3);
         System.out.println("¡Impacto!");
 
-        for (IShip ship : fleet) {
+        for (IShip ship : machineFleet) {
             if (ValidateShot(row, col, ship)) {
                 if (ship.isSunken()) {
                     System.out.println("🔥 Hundiste un " + ship.getClass().getSimpleName());
@@ -423,65 +689,6 @@ public class Game implements IGame {
         }
         return false;
     }
-
-
-    /**
-     * Determines if a shot coordinate lies within a ship’s coordinates.
-     *
-     * @param shotRow shot row
-     * @param shotCol shot column
-     * @param ship    target ship
-     * @return {@code true} if the shot hits the ship
-     */
-    private boolean isShotInsideShip(int shotRow, int shotCol, IShip ship) {
-
-        int dr = calculateDeltaRow(ship);
-        int dc = calculateDeltaCol(ship);
-
-        int baseRow = ship.getRow();
-        int baseCol = ship.getCol();
-
-        for (int i = 0; i < ship.getShipSize(); i++) {
-            int currentRow = baseRow + dr * i;
-            int currentCol = baseCol + dc * i;
-
-            if (shotRow == currentRow && shotCol == currentCol) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Determines the row increment based on ship direction.
-     *
-     * @param ship the ship
-     * @return row displacement
-     */
-
-    private int calculateDeltaRow(IShip ship) {
-        return switch (ship.getDirection()) {
-            case DOWN -> 1;
-            case UP -> -1;
-            default -> 0;
-        };
-    }
-
-    /**
-     * Determines the column increment based on ship direction.
-     *
-     * @param ship the ship
-     * @return column displacement
-     */
-    private int calculateDeltaCol(IShip ship) {
-        return switch (ship.getDirection()) {
-            case RIGHT -> 1;
-            case LEFT -> -1;
-            default -> 0;
-        };
-    }
-
 
     /**
      * Executes the human player's entire turn, including validation and turn advancement.
@@ -510,57 +717,35 @@ public class Game implements IGame {
         advanceTurn();
     }
 
-    /**
-     * Retrieves all the board coordinates occupied by a specific ship.
-     *
-     * @param ship the ship to inspect
-     * @return a list of coordinates representing the ship
-     */
-    // cambio asi tmb
-    public List<int[]> getShipCoordinates(IShip ship) {
-        List<int[]> coords = new ArrayList<>();
+    // ================ DEBUGGING =======================
 
-        int row = ship.getRow();
-        int col = ship.getCol();
-        int size = ship.getShipSize();
-
-        int dr = 0, dc = 0;
-
-        switch (ship.getDirection()) {
-            case RIGHT -> dc = 1;
-            case LEFT  -> dc = -1;
-            case DOWN  -> dr = 1;
-            case UP    -> dr = -1;
+    public void printBoardState(String boardName, Board board) {
+        System.out.println("\n=== " + boardName + " ===");
+        System.out.print("   ");
+        for (int c = 0; c < 10; c++) {
+            System.out.print(c + " ");
         }
+        System.out.println();
 
-        for (int i = 0; i < size; i++) {
-            int currentRow = row + dr * i;
-            int currentCol = col + dc * i;
-            coords.add(new int[]{currentRow, currentCol});  // [row, col]
-        }
-
-        return coords;
-    }
-
-
-    /**
-     * Prints the coordinates of all ships currently placed in the fleet.
-     */
-    @Override
-    public void printFleetCoordinates() {
-        for (IShip ship : fleet) {
-            System.out.println("--- " + ship.getClass().getSimpleName() + " ---");
-
-            for (int[] c : getShipCoordinates(ship)) {
-                // c[0] = row (fila) = Y
-                // c[1] = col (columna) = X
-                System.out.println("Fila=" + c[0] + "  Col=" + c[1]);
-                // O si prefieres mantener X/Y:
-                // System.out.println("Y=" + c[0] + "  X=" + c[1]);
+        for (int r = 0; r < 10; r++) {
+            System.out.print(r + "| ");
+            for (int c = 0; c < 10; c++) {
+                int cell = board.getCell(r, c);
+                String symbol = switch(cell) {
+                    case 0 -> "·"; // Agua
+                    case 1 -> "■"; // Barco
+                    case 2 -> "○"; // Miss
+                    case 3 -> "X"; // Hit
+                    default -> "?";
+                };
+                System.out.print(symbol + " ");
             }
             System.out.println();
         }
+        System.out.println();
     }
+
+    //================== GETTERS =======================
 
     /**
      * Returns whether the game has reached its end.
@@ -568,37 +753,31 @@ public class Game implements IGame {
      * @return {@code true} if the game is finished
      */
     @Override
-    public boolean isGameOver() {
-        return gameOver;
-    }
+    public boolean isGameOver() {return gameOver;}
     /**
      * Returns the list of all players in the game.
      *
      * @return the list of players
      */
     @Override
-    public List<Object> getPlayers() {
-        return players;
-    }
+    public List<Object> getPlayers() {return players;}
     /**
      * Returns the game's main board.
      *
      * @return the board instance
      */
     @Override
-    public Board getBoard(){return board;}
-
+    public Board getMachineBoard(){return machineBoard;}
+    public Board getHumanBoard() {return humanBoard;}
     /**
      * Retrieves the complete fleet of placed ships.
      *
      * @return the fleet list
      */
     @Override
-    public List<IShip> getFleet() {
-        return fleet;
-    }
-
+    public List<IShip> getMachineFleet() {return machineFleet;}
     @Override
     public Human getHuman(){ return human;}
-
+    @Override
+    public GameState getCurrentState() {return currentState;}
 }

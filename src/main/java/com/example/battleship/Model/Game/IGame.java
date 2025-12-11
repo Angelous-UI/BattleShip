@@ -57,7 +57,7 @@ public interface IGame {
      *
      * @return the board instance
      */
-    Board getBoard();
+    Board getMachineBoard();
 
     /**
      * Returns the player whose turn is currently active.
@@ -82,9 +82,10 @@ public interface IGame {
      *
      * @return the list of ships
      */
-    public List<IShip> getFleet();
+    public List<IShip> getMachineFleet();
 
     public Human getHuman();
 
 
+    Game.GameState getCurrentState();
 }

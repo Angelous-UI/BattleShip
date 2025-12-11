@@ -1,8 +1,6 @@
 package com.example.battleship.Model.Game;
 
-import com.example.battleship.Model.Board.Board;
 import com.example.battleship.Model.Exceptions.InvalidPositionException;
-import com.example.battleship.Model.Player.Human;
 import com.example.battleship.Model.Ship.Frigate;
 import com.example.battleship.Model.Ship.IShip;
 
@@ -25,7 +23,7 @@ class GameTest {
         assertDoesNotThrow(() -> game.placeShip(ship));
 
         // Board should have a ship at 3,3
-        assertEquals(1, game.getBoard().getCell(3, 3));
+        assertEquals(1, game.getMachineBoard().getCell(3, 3));
     }
 
     @Test
