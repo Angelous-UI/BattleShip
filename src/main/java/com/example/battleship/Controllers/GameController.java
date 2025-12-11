@@ -837,7 +837,7 @@ public class GameController implements Initializable {
             event.consume();
 
             double centerX = button.getLayoutX() + button.getWidth() / 2;
-            double centerY = button.getLayoutY() + button.getHeight() / 2;  
+            double centerY = button.getLayoutY() + button.getHeight() / 2;
 
             createExplosion(centerX, centerY);
             shakeButton(button);
