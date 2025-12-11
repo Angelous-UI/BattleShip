@@ -4,6 +4,7 @@ import com.example.battleship.Model.Board.Board;
 import com.example.battleship.Model.Game.Game;
 import com.example.battleship.Model.Ship.*;
 import com.example.battleship.Model.Utils.SpriteSheet;
+import com.example.battleship.Views.GameView;
 import com.example.battleship.Views.MainMenuView;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
@@ -32,7 +33,7 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
 import javafx.scene.control.Alert;
-
+import com.example.battleship.Model.Game.GameStateHolder;
 
 import java.net.URL;
 import java.util.*;
@@ -117,10 +118,16 @@ public class GameController implements Initializable {
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
-        game = new Game();
-        game.generateFleet(); // Generate fleet for the machine
 
-        currentShipSize = fleet[0];
+        if (gameExecutor != null && !gameExecutor.isShutdown()) {
+            gameExecutor.shutdownNow();
+        }
+        if (aiExecutor != null && !aiExecutor.isShutdown()) {
+            aiExecutor.shutdownNow();
+        }
+
+        game = new Game();
+        game.generateFleet();
 
         gPlayer = playerCanvas.getGraphicsContext2D();
         gEnemy = enemyCanvas.getGraphicsContext2D();
@@ -128,33 +135,75 @@ public class GameController implements Initializable {
         gameExecutor = Executors.newSingleThreadExecutor();
         aiExecutor = Executors.newSingleThreadExecutor();
 
-        boardEnemy = game.getMachineBoard();
-        // board = new Board();
-
         setupBackgroundVideo();
         addExplosionEffect(GoBackButton);
-
-        playerCanvas.setOnMouseMoved(this::previewShip);
-        playerCanvas.setOnMouseClicked(this::placeShip);
-        playerCanvas.setOnMouseExited(e -> drawPlacedShips());
-
-        playerCanvas.setFocusTraversable(true);
-        playerCanvas.setOnKeyPressed(this::rotate);
-
-        Platform.runLater(() -> playerCanvas.requestFocus());
-
-        playerCanvas.setOnMouseClicked(e -> {
-            playerCanvas.requestFocus();
-            placeShip(e);
-        });
-
-        drawGrid(gPlayer);
-        drawGrid(gEnemy);
-        drawEnemyFleet();
 
         missImage = new Image(getClass().getResource("/Battleship-Images/12.png").toExternalForm());
         hitImage = new Image(getClass().getResource("/Battleship-Images/11.png").toExternalForm());
         explosionImage = new Image(getClass().getResource("/Battleship-Images/13.png").toExternalForm());
+
+        // Verificar si hay un juego guardado temporalmente
+        if (GameStateHolder.hasSavedGame()) {
+            // Cargar el juego guardado
+            game = GameStateHolder.getSavedGame();
+
+            // Restaurar referencias
+            boardEnemy = game.getMachineBoard();
+            ships.clear();
+            ships.addAll(game.getHumanFleet());
+
+            // Redibujar los grids
+            drawGrid(gPlayer);
+            drawGrid(gEnemy);
+            drawPlacedShips();
+            drawEnemyFleet();
+            redrawEnemyBoard();
+
+            // Configurar handlers
+            if (game.getCurrentState() == Game.GameState.PLAYING) {
+                enemyCanvas.setOnMouseClicked(this::onPlayerShot);
+
+                updateStatusLabel(game.isHumanTurn() ?
+                        "¡Tu turno! Click en el tablero enemigo" :
+                        "Turno de la máquina");
+                turnLabel.setText("TURNO: " + (game.isHumanTurn() ? "Jugador" : "Máquina"));
+
+                // Si es turno de la máquina, programar su disparo
+                if (game.isMachineTurn()) {
+                    scheduleAITurn();
+                }
+            }
+
+            System.out.println("✅ Partida continuada desde memoria");
+        } else {
+            // Iniciar nuevo juego normalmente
+            game = new Game();
+            game.generateFleet();
+
+            currentShipSize = fleet[0];
+
+            boardEnemy = game.getMachineBoard();
+
+            playerCanvas.setOnMouseMoved(this::previewShip);
+            playerCanvas.setOnMouseClicked(this::placeShip);
+            playerCanvas.setOnMouseExited(e -> drawPlacedShips());
+
+            playerCanvas.setFocusTraversable(true);
+            playerCanvas.setOnKeyPressed(this::rotate);
+
+            Platform.runLater(() -> playerCanvas.requestFocus());
+
+            playerCanvas.setOnMouseClicked(e -> {
+                playerCanvas.requestFocus();
+                placeShip(e);
+            });
+
+            drawGrid(gPlayer);
+            drawGrid(gEnemy);
+            drawEnemyFleet();
+
+            System.out.println("🆕 Nueva partida iniciada");
+        }
     }
 
     private void rotate(KeyEvent ke){
@@ -163,6 +212,7 @@ public class GameController implements Initializable {
             drawPlacedShips();
         }
     }
+
     
     // =========== PLAYER GRID ====================
 
@@ -778,6 +828,7 @@ public class GameController implements Initializable {
         if (mediaPlayer != null) {
             mediaPlayer.stop();
             mediaPlayer.dispose();
+            mediaPlayer = null;
         }
     }
 
@@ -786,7 +837,7 @@ public class GameController implements Initializable {
             event.consume();
 
             double centerX = button.getLayoutX() + button.getWidth() / 2;
-            double centerY = button.getLayoutY() + button.getHeight() / 2;
+            double centerY = button.getLayoutY() + button.getHeight() / 2;  
 
             createExplosion(centerX, centerY);
             shakeButton(button);
@@ -870,24 +921,45 @@ public class GameController implements Initializable {
 
     private void loadMainMenuView() {
         try {
-            MainMenuView.deleteInstance(); // Limpiar instancia previa, pues si es que hay bro
-            MainMenuView mainMenuView = MainMenuView.getInstance();
+
+            isRunning = false;
+
+            if (gameExecutor != null) {gameExecutor.shutdownNow();}
+            if (aiExecutor != null) {aiExecutor.shutdownNow();}
+
+            stopVideo();
 
             Stage currentStage = (Stage) GoBackButton.getScene().getWindow();
-            currentStage.close();
+
+            GameView.deleteInstance(); // Limpia la instancia actual de Game
+            MainMenuView.deleteInstance(); // Limpia cualquier instancia previa del MainMenu
+
+            MainMenuView mainMenuView = MainMenuView.getInstance(); // Crea nueva instancia del MainMenu
+
+            currentStage.close(); // Cierra la ventana del juego
 
         } catch (Exception e) {
             System.err.println("Error loading MainMenu view: " + e.getMessage());
             e.printStackTrace();
         }
     }
-
     @FXML
     private void onBackMenu() {
+        isRunning = false;
+
+        if (gameExecutor != null) {
+            gameExecutor.shutdownNow();
+        }
+        if (aiExecutor != null) {
+            aiExecutor.shutdownNow();
+        }
+
         stopVideo();
         System.out.println("Go back to main menu...");
         loadMainMenuView();
     }
+
+
 
     @FXML
     private void showHelp() {

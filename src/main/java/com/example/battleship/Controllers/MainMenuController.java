@@ -1,5 +1,6 @@
 package com.example.battleship.Controllers;
 
+import com.example.battleship.Views.MainMenuView;
 import javafx.animation.*;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -14,6 +15,7 @@ import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import com.example.battleship.Views.GameView;
+import com.example.battleship.Model.Game.GameStateHolder;
 
 import java.net.URL;
 import java.util.Random;
@@ -53,6 +55,23 @@ public class MainMenuController implements Initializable {
         addExplosionEffect(playButton);
         addExplosionEffect(continueButton);
         addExplosionEffect(exitButton);
+
+        updateContinueButton(); //Habilitar o deshabilitar el boton de continaur si hay partida en memoria o no
+    }
+
+    //Este es el metodo que use atras ve
+
+    private void updateContinueButton() {
+        boolean hasSave = GameStateHolder.hasSavedGame();
+        continueButton.setDisable(!hasSave);
+
+        if (!hasSave) {
+            continueButton.setOpacity(0.5);
+        } else {
+            continueButton.setOpacity(1.0);
+        }
+
+        System.out.println((hasSave ? "✅" : "⚠️") + " Partida en memoria: " + hasSave);
     }
 
     /**
@@ -248,11 +267,15 @@ public class MainMenuController implements Initializable {
 
             System.gc(); // fuerza la limpieza
 
-            GameView.deleteInstance(); // Borramos instancia previa, pues si es que hay bro
-            GameView gameView = GameView.getInstance();
 
             Stage currentStage = (Stage) playButton.getScene().getWindow();
-            currentStage.close();
+
+            GameView.deleteInstance(); // Limpia cualquier instancia previa de Game
+            MainMenuView.deleteInstance(); // Limpia el MainMenu actual
+
+            GameView gameView = GameView.getInstance(); // Crea la nueva instancia de Game
+
+            currentStage.close(); // Cierra la ventana del menú
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -265,6 +288,8 @@ public class MainMenuController implements Initializable {
      */
     @FXML
     private void onNewGame() {
+        GameStateHolder.clearSavedGame();
+
         stopVideo();
         System.out.println("Starting Game...");
         loadGameView();
@@ -276,8 +301,13 @@ public class MainMenuController implements Initializable {
      */
     @FXML
     private void onContinue() {
+        if (!GameStateHolder.hasSavedGame()){
+            System.err.println("No hay partida en memoria");
+            return;
+        }
         stopVideo();
         System.out.println("Loading Game...");
+        loadGameView();
     }
 
     /**

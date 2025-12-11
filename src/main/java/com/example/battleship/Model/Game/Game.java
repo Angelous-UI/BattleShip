@@ -105,6 +105,9 @@ public class Game implements IGame {
         if (humanFleet.isEmpty()) {
             throw new InvalidGameStateException("Player must place their ships first.");
         }
+
+        smartAI.reset();
+
         currentState = GameState.PLAYING;
         currentPlayerIndex = 0;
     }
@@ -380,18 +383,34 @@ public class Game implements IGame {
             throw new InvalidGameStateException("No es turno de la máquina");
         }
 
-        Random rand = new Random();
-        int row, col;
+        // ✅ OBTENER DISPARO INTELIGENTE
+        int[] shot = smartAI.getNextShot();
+        int row = shot[0];
+        int col = shot[1];
 
-        do {
-            row = rand.nextInt(10); // 0-9
-            col = rand.nextInt(10); // 0-9
-        } while (machineShots.contains(row + "," + col));
+        System.out.println("🤖 [IA] " + smartAI.getDebugInfo());
+        System.out.println("🤖 [IA] Disparando a: (" + row + "," + col + ")");
 
+        // Registrar el disparo
         machineShots.add(row + "," + col);
 
-        // El humanBoard usa 0-9
+        // Procesar el disparo
         ShotResult result = processShot(row, col, humanBoard, humanFleet);
+
+        // ✅ INFORMAR RESULTADO COMPLETO A LA IA
+        boolean hit = (result == ShotResult.HIT || result == ShotResult.SUNK);
+        boolean sunk = (result == ShotResult.SUNK);
+
+        smartAI.registerResult(row, col, hit, sunk);
+
+        System.out.println("🤖 [IA] Resultado: " + result +
+                " (hit=" + hit + ", sunk=" + sunk + ")");
+
+        // 🔍 Debug adicional para verificar
+        if (sunk) {
+            long sunkenCount = humanFleet.stream().filter(IShip::isSunken).count();
+            System.out.println("🤖 [IA] Total barcos hundidos del jugador: " + sunkenCount);
+        }
 
         return new int[]{row, col, result.ordinal()};
     }
@@ -780,4 +799,8 @@ public class Game implements IGame {
     public Human getHuman(){ return human;}
     @Override
     public GameState getCurrentState() {return currentState;}
+    //getter pa la fleet del jugador
+    public List <IShip> getHumanFleet(){
+        return humanFleet;
+    }
 }
