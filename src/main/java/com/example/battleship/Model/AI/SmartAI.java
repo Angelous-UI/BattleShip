@@ -844,5 +844,23 @@ public class SmartAI {
      *
      * <p>Clears all tracking data, resets ship counts, and
      * reinitializes the knowledge board and heat map.</p> */
+    public void reset() {
+        currentMode = Mode.HUNT;
+        targetQueue.clear();
+        currentShipHits.clear();
+        shotHistory.clear();
+        remainingShips[0] = 4; remainingShips[1] = 3;
+        remainingShips[2] = 2; remainingShips[3] = 1;
+        for (int i = 0; i < 10; i++) {
+            Arrays.fill(knownBoard[i], 0);
+            Arrays.fill(heatMap[i], 0);
+        }
+    }
+
+    public String getDebugInfo() {
+        return String.format("Mode: %s | Queue: %d | Hits: %d | Ships: %s",
+                currentMode, targetQueue.size(), currentShipHits.size(),
+                Arrays.toString(remainingShips));
+    }
 
 }
