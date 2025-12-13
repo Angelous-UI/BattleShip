@@ -1,10 +1,12 @@
 package com.example.battleship.Model.Ship;
 
+import java.io.Serializable;
+
 /**
  * Submarine: a ship occupying three cells (size = 3).
  * Maintains hit counting and sunken flag.
  */
-public class Submarine implements IShip {
+public class Submarine implements IShip, Serializable {
     private boolean sunken;
     private int hitCount;
     private final int positionX;

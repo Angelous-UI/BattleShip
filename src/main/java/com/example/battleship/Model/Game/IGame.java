@@ -1,4 +1,5 @@
 package com.example.battleship.Model.Game;
+import com.example.battleship.Model.AI.SmartAI;
 import com.example.battleship.Model.Board.Board;
 import com.example.battleship.Model.Exceptions.InvalidPositionException;
 import com.example.battleship.Model.Exceptions.InvalidShotException;
@@ -88,4 +89,6 @@ public interface IGame {
 
 
     Game.GameState getCurrentState();
+
+    SmartAI getSmartAI();
 }

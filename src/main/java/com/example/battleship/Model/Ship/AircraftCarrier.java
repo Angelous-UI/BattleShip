@@ -1,10 +1,12 @@
 package com.example.battleship.Model.Ship;
 
+import java.io.Serializable;
+
 /**
  * AircraftCarrier: a ship occupying four cells (size = 4).
  * Tracks registered hits and sunken state.
  */
-public class AircraftCarrier implements IShip {
+public class AircraftCarrier implements IShip, Serializable {
     private boolean sunken;
     private int hitCount;
     private final int positionX;

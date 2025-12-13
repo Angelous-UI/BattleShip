@@ -1,10 +1,12 @@
 package com.example.battleship.Model.Ship;
 
+import java.io.Serializable;
+
 /**
  * Interface describing a ship placed on the board.
  * Implementations expose position, direction, size and hit tracking.
  */
-public interface IShip {
+public interface IShip extends Serializable {
 /**
  * Cardinal directions used for ship placement and iteration.
  */

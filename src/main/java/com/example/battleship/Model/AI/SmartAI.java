@@ -3,68 +3,185 @@ package com.example.battleship.Model.AI;
 import java.util.*;
 
 /**
- * Inteligencia Artificial AVANZADA para Battleship.
+ * Advanced Artificial Intelligence for the Battleship game.
  *
- * Estrategias implementadas:
- * 1. HUNT MODE: Usa heatmap de probabilidad basado en barcos restantes
- * 2. TARGET MODE: Persigue inteligentemente con múltiples estrategias
- * 3. Considera tamaño de barcos restantes para optimizar búsqueda
- * 4. Evita disparar a celdas imposibles después de hundir barcos
+ * <p>This AI uses a hybrid strategy composed of two main modes:</p>
+ * <ul>
+ *   <li><b>HUNT</b>: probabilistic search using a heat map when no active hits exist.</li>
+ *   <li><b>TARGET</b>: focused attack mode when one or more ships have been hit.</li>
+ * </ul>
+ *
+ * <p>Key features:</p>
+ * <ul>
+ *   <li>Tracks hits belonging to multiple ships simultaneously.</li>
+ *   <li>Uses BFS to correctly identify and process sunk ships.</li>
+ *   <li>Maintains an internal knowledge board of the enemy grid.</li>
+ *   <li>Uses a priority queue to select optimal target cells.</li>
+ *   <li>Employs a probability heat map based on remaining ship sizes.</li>
+ * </ul>
+ *
+ * <p>The board is assumed to be 10x10 and uses 0-based indexing.</p>
+ *
+ * @author Battleship Development Team
+ * @version 2.0
  */
 public class SmartAI {
 
+    /**
+     * Represents the current operational mode of the AI.
+     */
     private enum Mode {
-        HUNT,    // Buscando barcos
-        TARGET   // Persiguiendo un barco encontrado
+        /**
+         * General search mode with no active hits
+         */
+        HUNT,
+        /**
+         * Focused attack mode when at least one hit exists
+         */
+        TARGET
     }
 
+    /**
+     * Current operational mode
+     */
     private Mode currentMode = Mode.HUNT;
 
-    // Cola prioritaria de objetivos (ordenados por prioridad)
+    /**
+     * Priority queue containing candidate target cells
+     */
     private final PriorityQueue<ScoredCell> targetQueue = new PriorityQueue<>();
 
-    // Celdas que forman parte del barco actual siendo perseguido
+    /**
+     * List of all active hits (may belong to multiple ships)
+     */
     private final List<int[]> currentShipHits = new ArrayList<>();
 
-    // Historial de disparos
+    /**
+     * History of all fired shots to prevent duplicates
+     */
     private final Set<String> shotHistory = new HashSet<>();
 
-    // Tablero conocido (0=desconocido, 1=agua, 2=impacto, 3=hundido)
+    /**
+     * Internal knowledge board.
+     * <ul>
+     *   <li>0 = unknown</li>
+     *   <li>1 = water/miss</li>
+     *   <li>2 = hit</li>
+     *   <li>3 = sunk</li>
+     * </ul>
+     */
     private final int[][] knownBoard = new int[10][10];
 
-    // Barcos restantes por tamaño [1, 2, 3, 4]
-    private final int[] remainingShips = {4, 3, 2, 1}; // Fragatas, Destructores, Submarinos, Portaaviones
+    /**
+     * Remaining ships indexed by size: [0]=frigates(1), [1]=destroyers(2), [2]=submarines(3), [3]=carriers(4)
+     */
+    private final int[] remainingShips = {4, 3, 2, 1};
 
-    // Mapa de calor (probabilidad de que haya un barco)
+    /**
+     * Probability heat map used during HUNT mode
+     */
     private final int[][] heatMap = new int[10][10];
 
+    /**
+     * Represents a candidate cell to shoot at along with its priority score.
+     *
+     * <p>Instances of this class are stored inside a {@link PriorityQueue}
+     * so that higher-scored cells are selected first.</p>
+     */
     private static class ScoredCell implements Comparable<ScoredCell> {
-        int row, col, score;
+        /**
+         * Row index of the cell
+         */
+        int row;
 
+        /**
+         * Column index of the cell
+         */
+        int col;
+
+        /**
+         * Priority score (higher means more desirable)
+         */
+        int score;
+
+        /**
+         * Constructs a scored cell.
+         *
+         * @param row   row index (0–9)
+         * @param col   column index (0–9)
+         * @param score priority score
+         */
         ScoredCell(int row, int col, int score) {
             this.row = row;
             this.col = col;
             this.score = score;
         }
 
+        /**
+         * Compares two cells by score in descending order.
+         *
+         * @param other the cell to compare with
+         * @return negative if this cell has lower priority, positive if higher
+         */
         @Override
         public int compareTo(ScoredCell other) {
-            return Integer.compare(other.score, this.score); // Mayor score = mayor prioridad
+            return Integer.compare(other.score, this.score);
         }
     }
 
+    /**
+     * Cardinal directions used for grid exploration.
+     */
     private enum Direction {
-        NORTH(-1, 0), SOUTH(1, 0), EAST(0, 1), WEST(0, -1);
 
-        final int dr, dc;
+        /**
+         * Upward direction (decreasing row)
+         */
+        NORTH(-1, 0),
 
+        /**
+         * Downward direction (increasing row)
+         */
+        SOUTH(1, 0),
+
+        /**
+         * Right direction (increasing column)
+         */
+        EAST(0, 1),
+
+        /**
+         * Left direction (decreasing column)
+         */
+        WEST(0, -1);
+
+        /**
+         * Row delta
+         */
+        final int dr;
+
+        /**
+         * Column delta
+         */
+        final int dc;
+
+        /**
+         * Constructs a direction with row and column deltas.
+         *
+         * @param dr row delta
+         * @param dc column delta
+         */
         Direction(int dr, int dc) {
             this.dr = dr;
             this.dc = dc;
         }
 
+        /**
+         * Returns the opposite direction.
+         *
+         * @return opposite direction
+         */
         Direction opposite() {
-            return switch(this) {
+            return switch (this) {
                 case NORTH -> SOUTH;
                 case SOUTH -> NORTH;
                 case EAST -> WEST;
@@ -74,220 +191,555 @@ public class SmartAI {
     }
 
     /**
-     * Obtiene el próximo disparo inteligente.
+     * Determines the next shot to fire based on the current AI state.
+     *
+     * <p>The method prioritizes:</p>
+     * <ol>
+     *   <li>Queued high-priority targets</li>
+     *   <li>Adjacent exploration around active hits</li>
+     *   <li>Nearby fallback exploration</li>
+     *   <li>Probabilistic hunt mode using a heat map</li>
+     * </ol>
+     *
+     * @return an integer array {row, col} representing the next shot coordinates
      */
     public int[] getNextShot() {
-        int[] shot;
-
-        if (currentMode == Mode.TARGET) {
-            shot = getTargetModeShot();
-            if (shot == null) {
-                // No hay más targets válidos, volver a HUNT
-                currentMode = Mode.HUNT;
-                shot = getHuntModeShot();
+        System.out.println("\n🎯 [IA] ========== OBTENIENDO DISPARO ==========");
+        System.out.println("   Hits activos totales: " + currentShipHits.size());
+        if (!currentShipHits.isEmpty()) {
+            System.out.print("   Posiciones: ");
+            for (int[] hit : currentShipHits) {
+                System.out.print("(" + hit[0] + "," + hit[1] + ") ");
             }
+            System.out.println();
+        }
+
+        int[] shot = null;
+
+        if (!currentShipHits.isEmpty()) {
+            System.out.println("   🔥 MODO TARGET ACTIVO");
+            currentMode = Mode.TARGET;
+
+            shot = pollValidTarget();
+
+            if (shot == null) {
+                System.out.println("   📋 Regenerando targets...");
+                generateSmartTargets();
+                shot = pollValidTarget();
+            }
+
+            if (shot == null) {
+                System.out.println("   🔍 Explorando adyacentes...");
+                shot = exploreAllAdjacent();
+            }
+
+            if (shot == null) {
+                System.out.println("   ♟️ Patrón expandido...");
+                shot = findNearbyCell();
+            }
+
+            if (shot == null) {
+                System.out.println("   ⚠️ Recurso aleatorio");
+                shot = getRandomAvailableCell();
+            }
+
         } else {
+            System.out.println("   🔎 MODO HUNT");
             shot = getHuntModeShot();
         }
+
+        if (shot == null) {
+            System.err.println("   ❌ ERROR: fallback extremo");
+            shot = new int[]{0, 0};
+        }
+
+        System.out.println("   ✅ DISPARO: (" + shot[0] + "," + shot[1] + ")");
+        System.out.println("===============================================\n");
 
         shotHistory.add(shot[0] + "," + shot[1]);
         return shot;
     }
 
     /**
-     * Registra el resultado de un disparo.
+     * Polls the next valid target from the priority queue.
+     *
+     * <p>This method continuously polls cells from the queue until
+     * a valid target is found or the queue is empty.</p>
+     *
+     * @return coordinates {row, col} of the next valid target, or null if queue is empty
      */
-    public void registerResult(int row, int col, boolean hit, boolean sunk) {
-        if (!hit) {
-            knownBoard[row][col] = 1; // Agua
-            return;
+    private int[] pollValidTarget() {
+        System.out.println("      🎯 Cola size: " + targetQueue.size());
+
+        while (!targetQueue.isEmpty()) {
+            ScoredCell cell = targetQueue.poll();
+
+            if (isValidTarget(cell.row, cell.col)) {
+                System.out.println("      ✅ Target: (" + cell.row + "," + cell.col + ")");
+                return new int[]{cell.row, cell.col};
+            }
         }
 
-        // Impacto
-        knownBoard[row][col] = 2;
-        currentShipHits.add(new int[]{row, col});
-
-        if (sunk) {
-            handleSunkShip();
-        } else {
-            // Cambiar a TARGET mode y generar objetivos inteligentes
-            currentMode = Mode.TARGET;
-            generateSmartTargets();
-        }
+        System.out.println("      ❌ Sin targets válidos");
+        return null;
     }
 
     /**
-     * Maneja cuando se hunde un barco.
+     * Explores all adjacent cells around active hits.
+     *
+     * <p>Iterates through all current hits and checks the four
+     * cardinal directions for valid targets.</p>
+     *
+     * @return coordinates {row, col} of the first valid adjacent cell, or null if none found
      */
-    private void handleSunkShip() {
-        // Determinar tamaño del barco hundido
-        int shipSize = currentShipHits.size();
-
-        // Marcar como hundido y actualizar barcos restantes
+    private int[] exploreAllAdjacent() {
         for (int[] hit : currentShipHits) {
-            knownBoard[hit[0]][hit[1]] = 3;
+            for (Direction dir : Direction.values()) {
+                int newRow = hit[0] + dir.dr;
+                int newCol = hit[1] + dir.dc;
+
+                if (isValidTarget(newRow, newCol)) {
+                    System.out.println("      ✅ Adyacente: (" + newRow + "," + newCol + ")");
+                    return new int[]{newRow, newCol};
+                }
+            }
         }
 
-        // Reducir contador de barcos restantes
-        if (shipSize >= 1 && shipSize <= 4) {
-            remainingShips[shipSize - 1]--;
-            System.out.println("🤖 [IA] Hundí un barco de tamaño " + shipSize +
-                    ". Restantes: " + Arrays.toString(remainingShips));
-        }
-
-        // Marcar celdas adyacentes al barco hundido como imposibles
-        markAdjacentAsImpossible();
-
-        // Reset
-        currentShipHits.clear();
-        targetQueue.clear();
-        currentMode = Mode.HUNT;
+        System.out.println("      ❌ Sin adyacentes");
+        return null;
     }
 
     /**
-     * Marca las celdas adyacentes a un barco hundido como agua (no puede haber barcos pegados).
+     * Finds a valid cell within a 3-cell radius of active hits.
+     *
+     * <p>Used as a fallback when no adjacent cells are available.</p>
+     *
+     * @return coordinates {row, col} of a nearby valid cell, or null if none found
      */
-    private void markAdjacentAsImpossible() {
-        Set<String> toMark = new HashSet<>();
-
+    private int[] findNearbyCell() {
         for (int[] hit : currentShipHits) {
-            // Marcar todas las 8 direcciones (incluidas diagonales)
-            for (int dr = -1; dr <= 1; dr++) {
-                for (int dc = -1; dc <= 1; dc++) {
-                    if (dr == 0 && dc == 0) continue;
-
+            for (int dr = -3; dr <= 3; dr++) {
+                for (int dc = -3; dc <= 3; dc++) {
                     int newRow = hit[0] + dr;
                     int newCol = hit[1] + dc;
 
-                    if (isValidCell(newRow, newCol) && knownBoard[newRow][newCol] == 0) {
-                        toMark.add(newRow + "," + newCol);
+                    if (isValidTarget(newRow, newCol)) {
+                        System.out.println("      ✅ Cercana: (" + newRow + "," + newCol + ")");
+                        return new int[]{newRow, newCol};
                     }
                 }
             }
         }
 
-        // Marcar como agua
-        for (String cell : toMark) {
+        System.out.println("      ❌ Sin celdas cercanas");
+        return null;
+    }
+
+    /**
+     * Checks if a cell is a valid target for shooting.
+     *
+     * <p>A cell is valid if it's within bounds, hasn't been shot,
+     * and is unknown (value 0 in knownBoard).</p>
+     *
+     * @param row row index
+     * @param col column index
+     * @return true if the cell is a valid target, false otherwise
+     */
+    private boolean isValidTarget(int row, int col) {
+        return isValidCell(row, col) &&
+                !hasBeenShot(row, col) &&
+                knownBoard[row][col] == 0;
+    }
+
+    /**
+     * Registers the result of a shot fired by the AI.
+     *
+     * <p>This method updates the AI's internal state based on whether
+     * the shot was a hit or miss, and whether it sunk a ship.</p>
+     *
+     * @param row  row coordinate of the shot
+     * @param col  column coordinate of the shot
+     * @param hit  true if the shot hit a ship, false if it was a miss
+     * @param sunk true if the shot sunk a ship, false otherwise
+     */
+    public void registerResult(int row, int col, boolean hit, boolean sunk) {
+        System.out.println("\n📊 [IA] ========== RESULTADO ==========");
+        System.out.println("   Pos: (" + row + "," + col + ") | Hit: " + hit + " | Sunk: " + sunk);
+
+        if (!hit) {
+            knownBoard[row][col] = 1;
+            System.out.println("   💧 AGUA - manteniendo " + currentShipHits.size() + " hits");
+            return;
+        }
+
+        // IMPACTO
+        knownBoard[row][col] = 2;
+
+        boolean exists = currentShipHits.stream()
+                .anyMatch(h -> h[0] == row && h[1] == col);
+
+        if (!exists) {
+            currentShipHits.add(new int[]{row, col});
+            System.out.println("   💥 NUEVO HIT agregado!");
+        }
+
+        System.out.println("   📍 Total hits: " + currentShipHits.size());
+
+        if (sunk) {
+            System.out.println("   🔥 BARCO HUNDIDO!");
+            handleSunkShip(row, col);
+        } else {
+            System.out.println("   ⚠️ NO hundido - continuando");
+            currentMode = Mode.TARGET;
+            targetQueue.clear();
+            generateSmartTargets();
+        }
+
+        System.out.println("=======================================\n");
+    }
+
+    /**
+     * Handles the logic when a ship is sunk.
+     *
+     * <p>Uses BFS to identify all cells belonging to the sunk ship,
+     * removes only those hits from the active list, and marks adjacent
+     * cells as impossible. If other hits remain, maintains TARGET mode.</p>
+     *
+     * @param lastHitRow row coordinate of the final hit that sunk the ship
+     * @param lastHitCol column coordinate of the final hit that sunk the ship
+     */
+    private void handleSunkShip(int lastHitRow, int lastHitCol) {
+        System.out.println("   🔍 Identificando barco hundido...");
+
+        // Encontrar todos los hits conectados al último disparo (el barco hundido)
+        Set<String> sunkShipCells = findConnectedShip(lastHitRow, lastHitCol);
+
+        System.out.println("   🔥 Barco hundido tiene " + sunkShipCells.size() + " celdas:");
+        for (String cell : sunkShipCells) {
+            System.out.println("      - " + cell);
+        }
+
+        // Marcar como hundido
+        for (String cell : sunkShipCells) {
             String[] parts = cell.split(",");
             int r = Integer.parseInt(parts[0]);
             int c = Integer.parseInt(parts[1]);
-            knownBoard[r][c] = 1;
+            knownBoard[r][c] = 3;
+
+            // Marcar adyacentes de este barco como imposibles
+            markAdjacentAsImpossible(r, c);
+        }
+
+        // ✅ SOLO remover los hits del barco hundido
+        currentShipHits.removeIf(hit -> {
+            String key = hit[0] + "," + hit[1];
+            return sunkShipCells.contains(key);
+        });
+
+        System.out.println("   🧹 Hits restantes después de limpiar: " + currentShipHits.size());
+
+        if (!currentShipHits.isEmpty()) {
+            System.out.println("   ⚠️ AÚN HAY HITS ACTIVOS - manteniendo TARGET mode");
+            System.out.print("   Hits restantes: ");
+            for (int[] hit : currentShipHits) {
+                System.out.print("(" + hit[0] + "," + hit[1] + ") ");
+            }
+            System.out.println();
+            currentMode = Mode.TARGET;
+            targetQueue.clear();
+            generateSmartTargets();
+        } else {
+            System.out.println("   ✅ No hay más hits - volviendo a HUNT");
+            currentMode = Mode.HUNT;
+            targetQueue.clear();
+        }
+
+        // Actualizar contador de barcos
+        int shipSize = sunkShipCells.size();
+        if (shipSize >= 1 && shipSize <= 4) {
+            remainingShips[shipSize - 1]--;
+            System.out.println("   📊 Barcos restantes: " + Arrays.toString(remainingShips));
         }
     }
 
     /**
-     * Genera objetivos inteligentes basados en los impactos actuales.
+     * Finds all connected hit cells belonging to the same ship using BFS.
+     *
+     * <p>Starting from the given coordinates, this method explores
+     * adjacent cells to identify all parts of the sunk ship.</p>
+     *
+     * @param startRow starting row coordinate
+     * @param startCol starting column coordinate
+     * @return set of strings in "row,col" format representing all cells of the sunk ship
+     */
+    private Set<String> findConnectedShip(int startRow, int startCol) {
+        Set<String> visited = new HashSet<>();
+        Queue<int[]> queue = new LinkedList<>();
+
+        queue.add(new int[]{startRow, startCol});
+        visited.add(startRow + "," + startCol);
+
+        while (!queue.isEmpty()) {
+            int[] current = queue.poll();
+            int row = current[0];
+            int col = current[1];
+
+            // Revisar las 4 direcciones adyacentes
+            for (Direction dir : Direction.values()) {
+                int newRow = row + dir.dr;
+                int newCol = col + dir.dc;
+                String key = newRow + "," + newCol;
+
+                // Si es un hit (2) o hundido (3) y no lo hemos visitado
+                if (isValidCell(newRow, newCol) &&
+                        !visited.contains(key) &&
+                        (knownBoard[newRow][newCol] == 2 || knownBoard[newRow][newCol] == 3)) {
+
+                    visited.add(key);
+                    queue.add(new int[]{newRow, newCol});
+                }
+            }
+        }
+
+        return visited;
+    }
+
+    /**
+     * Marks all cells adjacent to a sunk ship cell as water (impossible targets).
+     *
+     * <p>This prevents the AI from shooting at cells where ships cannot exist
+     * according to Battleship rules (ships cannot be adjacent).</p>
+     *
+     * @param row row coordinate of the sunk ship cell
+     * @param col column coordinate of the sunk ship cell
+     */
+    private void markAdjacentAsImpossible(int row, int col) {
+        for (int dr = -1; dr <= 1; dr++) {
+            for (int dc = -1; dc <= 1; dc++) {
+                if (dr == 0 && dc == 0) continue;
+
+                int newRow = row + dr;
+                int newCol = col + dc;
+
+                if (isValidCell(newRow, newCol) && knownBoard[newRow][newCol] == 0) {
+                    knownBoard[newRow][newCol] = 1;
+                }
+            }
+        }
+    }
+
+    /**
+     * Generates smart target cells based on current hits.
+     *
+     * <p>Groups hits by proximity to identify separate ships,
+     * then generates high-priority targets for each group.</p>
      */
     private void generateSmartTargets() {
         targetQueue.clear();
+        System.out.println("      🎯 Generando targets para " + currentShipHits.size() + " hits");
 
-        if (currentShipHits.size() == 1) {
-            // Solo un impacto - agregar las 4 direcciones con alta prioridad
-            int[] hit = currentShipHits.get(0);
+        if (currentShipHits.isEmpty()) return;
 
+        // Agrupar hits en posibles barcos diferentes
+        List<List<int[]>> shipGroups = groupHitsByProximity();
+
+        System.out.println("      📊 Grupos de barcos detectados: " + shipGroups.size());
+
+        // Generar targets para cada grupo
+        for (List<int[]> group : shipGroups) {
+            System.out.println("         Grupo con " + group.size() + " hits");
+            generateTargetsForGroup(group);
+        }
+
+        System.out.println("      📋 Total targets: " + targetQueue.size());
+    }
+
+    /**
+     * Groups hits by proximity to identify separate ships.
+     *
+     * <p>Uses BFS to find connected hits. Hits that are adjacent
+     * are grouped together as they likely belong to the same ship.</p>
+     *
+     * @return list of groups, where each group is a list of hit coordinates
+     */
+    private List<List<int[]>> groupHitsByProximity() {
+        List<List<int[]>> groups = new ArrayList<>();
+        Set<String> processed = new HashSet<>();
+
+        for (int[] hit : currentShipHits) {
+            String key = hit[0] + "," + hit[1];
+            if (processed.contains(key)) continue;
+
+            List<int[]> group = new ArrayList<>();
+            Queue<int[]> queue = new LinkedList<>();
+
+            queue.add(hit);
+            processed.add(key);
+            group.add(hit);
+
+            // BFS para encontrar hits conectados
+            while (!queue.isEmpty()) {
+                int[] current = queue.poll();
+
+                for (Direction dir : Direction.values()) {
+                    int newRow = current[0] + dir.dr;
+                    int newCol = current[1] + dir.dc;
+                    String newKey = newRow + "," + newCol;
+
+                    if (processed.contains(newKey)) continue;
+
+                    // Buscar si hay un hit en esta posición
+                    for (int[] otherHit : currentShipHits) {
+                        if (otherHit[0] == newRow && otherHit[1] == newCol) {
+                            processed.add(newKey);
+                            group.add(otherHit);
+                            queue.add(otherHit);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            groups.add(group);
+        }
+
+        return groups;
+    }
+
+    /**
+     * Generates target cells for a specific group of hits.
+     *
+     * <p>For single hits, adds all four adjacent cells.
+     * For multiple hits, determines orientation and prioritizes extremes.</p>
+     *
+     * @param group list of hit coordinates belonging to the same ship
+     */
+    private void generateTargetsForGroup(List<int[]> group) {
+        if (group.size() == 1) {
+            // Un solo hit - las 4 direcciones
+            int[] hit = group.get(0);
             for (Direction dir : Direction.values()) {
                 int newRow = hit[0] + dir.dr;
                 int newCol = hit[1] + dir.dc;
-
-                if (isValidCell(newRow, newCol) && !hasBeenShot(newRow, newCol)) {
+                if (isValidTarget(newRow, newCol)) {
                     targetQueue.add(new ScoredCell(newRow, newCol, 100));
                 }
             }
         } else {
-            // Múltiples impactos - determinar orientación y priorizar extremos
-            Direction orientation = determineOrientation();
+            // Múltiples hits - determinar orientación
+            Direction orientation = determineOrientationForGroup(group);
 
             if (orientation != null) {
-                // Encontrar los extremos de la línea de impactos
-                int[] firstHit = findExtreme(orientation);
-                int[] lastHit = findExtreme(orientation.opposite());
-
-                // Priorizar celdas en los extremos
+                int[] firstHit = findExtremeInGroup(group, orientation.opposite());
+                int[] lastHit = findExtremeInGroup(group, orientation);
                 addExtremeCells(firstHit, orientation.opposite(), 200);
                 addExtremeCells(lastHit, orientation, 200);
+            } else {
+                // Sin orientación clara - explorar todo
+                for (int[] hit : group) {
+                    for (Direction dir : Direction.values()) {
+                        int newRow = hit[0] + dir.dr;
+                        int newCol = hit[1] + dir.dc;
+                        if (isValidTarget(newRow, newCol)) {
+                            targetQueue.add(new ScoredCell(newRow, newCol, 80));
+                        }
+                    }
+                }
             }
         }
     }
 
     /**
-     * Determina la orientación del barco basándose en los impactos.
+     * Determines the orientation (horizontal or vertical) of a group of hits.
+     *
+     * <p>Checks if all hits are in the same row (horizontal) or
+     * same column (vertical).</p>
+     *
+     * @param group list of hit coordinates
+     * @return the direction of the ship's orientation, or null if unclear
      */
-    private Direction determineOrientation() {
-        if (currentShipHits.size() < 2) return null;
+    private Direction determineOrientationForGroup(List<int[]> group) {
+        if (group.size() < 2) return null;
 
-        int[] first = currentShipHits.get(0);
-        int[] second = currentShipHits.get(1);
+        // Horizontal
+        int firstRow = group.get(0)[0];
+        if (group.stream().allMatch(h -> h[0] == firstRow)) {
+            List<int[]> sorted = new ArrayList<>(group);
+            sorted.sort(Comparator.comparingInt(a -> a[1]));
+            return sorted.get(0)[1] < sorted.get(sorted.size() - 1)[1] ? Direction.EAST : Direction.WEST;
+        }
 
-        if (first[0] == second[0]) {
-            // Misma fila = horizontal
-            return first[1] < second[1] ? Direction.EAST : Direction.WEST;
-        } else if (first[1] == second[1]) {
-            // Misma columna = vertical
-            return first[0] < second[0] ? Direction.SOUTH : Direction.NORTH;
+        // Vertical
+        int firstCol = group.get(0)[1];
+        if (group.stream().allMatch(h -> h[1] == firstCol)) {
+            List<int[]> sorted = new ArrayList<>(group);
+            sorted.sort(Comparator.comparingInt(a -> a[0]));
+            return sorted.get(0)[0] < sorted.get(sorted.size() - 1)[0] ? Direction.SOUTH : Direction.NORTH;
         }
 
         return null;
     }
 
     /**
-     * Encuentra el extremo de los impactos en una dirección.
+     * Finds the extreme (furthest) hit in a group in a given direction.
+     *
+     * @param group list of hit coordinates
+     * @param dir   direction to search for the extreme
+     * @return coordinates of the extreme hit
      */
-    private int[] findExtreme(Direction dir) {
-        int[] extreme = currentShipHits.get(0);
-
-        for (int[] hit : currentShipHits) {
-            if (dir == Direction.NORTH && hit[0] < extreme[0]) extreme = hit;
-            else if (dir == Direction.SOUTH && hit[0] > extreme[0]) extreme = hit;
-            else if (dir == Direction.WEST && hit[1] < extreme[1]) extreme = hit;
-            else if (dir == Direction.EAST && hit[1] > extreme[1]) extreme = hit;
+    private int[] findExtremeInGroup(List<int[]> group, Direction dir) {
+        int[] extreme = group.get(0);
+        for (int[] hit : group) {
+            switch (dir) {
+                case NORTH -> {
+                    if (hit[0] < extreme[0]) extreme = hit;
+                }
+                case SOUTH -> {
+                    if (hit[0] > extreme[0]) extreme = hit;
+                }
+                case WEST -> {
+                    if (hit[1] < extreme[1]) extreme = hit;
+                }
+                case EAST -> {
+                    if (hit[1] > extreme[1]) extreme = hit;
+                }
+            }
         }
-
         return extreme;
     }
 
     /**
-     * Agrega celdas en un extremo con alta prioridad.
+     * Adds cells at the extremes of a ship group to the target queue.
+     *
+     * @param extreme coordinates of the extreme hit
+     * @param dir     direction to extend from the extreme
+     * @param score   priority score for the new target
      */
     private void addExtremeCells(int[] extreme, Direction dir, int score) {
         int newRow = extreme[0] + dir.dr;
         int newCol = extreme[1] + dir.dc;
-
-        if (isValidCell(newRow, newCol) && !hasBeenShot(newRow, newCol)) {
+        if (isValidTarget(newRow, newCol)) {
             targetQueue.add(new ScoredCell(newRow, newCol, score));
         }
     }
 
     /**
-     * Obtiene un disparo en modo TARGET.
-     */
-    private int[] getTargetModeShot() {
-        while (!targetQueue.isEmpty()) {
-            ScoredCell cell = targetQueue.poll();
-
-            if (!hasBeenShot(cell.row, cell.col) && knownBoard[cell.row][cell.col] == 0) {
-                return new int[]{cell.row, cell.col};
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Obtiene un disparo en modo HUNT usando mapa de calor.
+     * Selects a shot using probabilistic HUNT mode.
+     *
+     * <p>Updates the heat map based on possible ship placements,
+     * then selects a random cell from those with maximum probability.</p>
+     *
+     * @return coordinates {row, col} of the selected shot
      */
     private int[] getHuntModeShot() {
         updateHeatMap();
-
-        // Encontrar la celda con mayor probabilidad
         int maxHeat = -1;
         List<int[]> bestCells = new ArrayList<>();
 
         for (int row = 0; row < 10; row++) {
             for (int col = 0; col < 10; col++) {
                 if (hasBeenShot(row, col) || knownBoard[row][col] != 0) continue;
-
                 int heat = heatMap[row][col];
-
                 if (heat > maxHeat) {
                     maxHeat = heat;
                     bestCells.clear();
@@ -298,44 +750,28 @@ public class SmartAI {
             }
         }
 
-        if (bestCells.isEmpty()) {
-            return getRandomAvailableCell();
-        }
-
-        // Elegir aleatoriamente entre las mejores
-        return bestCells.get(new Random().nextInt(bestCells.size()));
+        return bestCells.isEmpty() ? getRandomAvailableCell() :
+                bestCells.get(new Random().nextInt(bestCells.size()));
     }
 
     /**
-     * Actualiza el mapa de calor basándose en los barcos restantes.
+     * Updates the probability heat map based on possible ship placements.
+     *
+     * <p>For each remaining ship size, calculates all valid placements
+     * and increments the heat value of affected cells.</p>
      */
     private void updateHeatMap() {
-        // Resetear
-        for (int i = 0; i < 10; i++) {
-            Arrays.fill(heatMap[i], 0);
-        }
-
-        // Para cada tamaño de barco restante
+        for (int i = 0; i < 10; i++) Arrays.fill(heatMap[i], 0);
         for (int size = 1; size <= 4; size++) {
             if (remainingShips[size - 1] <= 0) continue;
-
             int count = remainingShips[size - 1];
-
-            // Probar todas las posiciones posibles
             for (int row = 0; row < 10; row++) {
                 for (int col = 0; col < 10; col++) {
-                    // Horizontal
                     if (canPlaceShip(row, col, size, true)) {
-                        for (int i = 0; i < size; i++) {
-                            heatMap[row][col + i] += count;
-                        }
+                        for (int i = 0; i < size; i++) heatMap[row][col + i] += count;
                     }
-
-                    // Vertical
                     if (canPlaceShip(row, col, size, false)) {
-                        for (int i = 0; i < size; i++) {
-                            heatMap[row + i][col] += count;
-                        }
+                        for (int i = 0; i < size; i++) heatMap[row + i][col] += count;
                     }
                 }
             }
@@ -343,26 +779,32 @@ public class SmartAI {
     }
 
     /**
-     * Verifica si un barco puede colocarse en una posición.
+     * Checks if a ship of given size can be placed at the specified position.
+     *
+     * @param row        starting row
+     * @param col        starting column
+     * @param size       ship size
+     * @param horizontal true for horizontal placement, false for vertical
+     * @return true if placement is valid, false otherwise
      */
     private boolean canPlaceShip(int row, int col, int size, boolean horizontal) {
         for (int i = 0; i < size; i++) {
             int r = horizontal ? row : row + i;
             int c = horizontal ? col + i : col;
-
-            if (!isValidCell(r, c)) return false;
-            if (knownBoard[r][c] == 1 || knownBoard[r][c] == 3) return false; // Agua o hundido
+            if (!isValidCell(r, c) || knownBoard[r][c] == 1 || knownBoard[r][c] == 3) return false;
         }
-
         return true;
     }
 
     /**
-     * Obtiene una celda aleatoria disponible.
+     * Selects a random available cell from all unshot positions.
+     *
+     * <p>Used as a fallback when no better strategy is available.</p>
+     *
+     * @return coordinates {row, col} of a random available cell, or {0,0} if none exist
      */
     private int[] getRandomAvailableCell() {
         List<int[]> available = new ArrayList<>();
-
         for (int row = 0; row < 10; row++) {
             for (int col = 0; col < 10; col++) {
                 if (!hasBeenShot(row, col) && knownBoard[row][col] == 0) {
@@ -370,47 +812,37 @@ public class SmartAI {
                 }
             }
         }
-
         return available.isEmpty() ? new int[]{0, 0} :
                 available.get(new Random().nextInt(available.size()));
     }
 
+    /**
+     * Checks if a cell has already been shot at.
+     *
+     * @param row row index
+     * @param col column index
+     * @return true if the cell has been shot, false otherwise
+     */
     private boolean hasBeenShot(int row, int col) {
         return shotHistory.contains(row + "," + col);
     }
 
+    /**
+     * Checks if a cell is within the valid board boundaries.
+     *
+     * @param row row index
+     * @param col column index
+     * @return true if the cell is within bounds (0-9), false otherwise
+     */
     private boolean isValidCell(int row, int col) {
         return row >= 0 && row < 10 && col >= 0 && col < 10;
     }
 
+
     /**
-     * Reinicia la IA.
-     */
-    public void reset() {
-        currentMode = Mode.HUNT;
-        targetQueue.clear();
-        currentShipHits.clear();
-        shotHistory.clear();
+     * Resets the AI to its initial state.
+     *
+     * <p>Clears all tracking data, resets ship counts, and
+     * reinitializes the knowledge board and heat map.</p> */
 
-        // Resetear barcos: 4 fragatas, 3 destructores, 2 submarinos, 1 portaaviones
-        remainingShips[0] = 4;
-        remainingShips[1] = 3;
-        remainingShips[2] = 2;
-        remainingShips[3] = 1;
-
-        for (int i = 0; i < 10; i++) {
-            Arrays.fill(knownBoard[i], 0);
-            Arrays.fill(heatMap[i], 0);
-        }
-    }
-
-    public String getDebugInfo() {
-        return String.format(
-                "Mode: %s | Queue size: %d | Current hits: %d | Ships: %s",
-                currentMode,
-                targetQueue.size(),
-                currentShipHits.size(),
-                Arrays.toString(remainingShips)
-        );
-    }
 }

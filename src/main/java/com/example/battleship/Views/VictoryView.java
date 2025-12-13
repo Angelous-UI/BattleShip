@@ -33,10 +33,10 @@ public class VictoryView extends Stage {
         setTitle("Battleship victory");
         setResizable(false);
 
-        //Volemos modal entonces no puede interactuar con la ventana padre
+
         initModality(Modality.APPLICATION_MODAL);
 
-        //Certrar ventana
+
         setOnCloseRequest(event->{
             Holder.INSTANCE=null;
         });

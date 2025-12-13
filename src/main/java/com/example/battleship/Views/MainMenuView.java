@@ -35,7 +35,7 @@ public class MainMenuView extends Stage {
         setTitle("Battleship Main Menu");
         setResizable(false);
 
-        //aca cerramos la ventana
+
         setOnCloseRequest(event -> {
             controller.stopVideo();
             Holder.INSTANCE= null;

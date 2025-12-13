@@ -1,5 +1,8 @@
 package com.example.battleship.Controllers;
 
+import com.example.battleship.Model.Game.GameState;
+import com.example.battleship.Model.Serializable.SerializableFileHandler;
+import com.example.battleship.Model.TextFile.IPlaneTextFileHandler;
 import com.example.battleship.Views.MainMenuView;
 import javafx.animation.*;
 import javafx.application.Platform;
@@ -15,7 +18,7 @@ import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import com.example.battleship.Views.GameView;
-import com.example.battleship.Model.Game.GameStateHolder;
+/*import com.example.battleship.Model.Game.GameStateHolder;*/
 
 import java.net.URL;
 import java.util.Random;
@@ -44,6 +47,8 @@ public class MainMenuController implements Initializable {
 
     private MediaPlayer mediaPlayer;
     private Stage stage;
+    IPlaneTextFileHandler planeTextFileReader;
+    private SerializableFileHandler serializableHandler = new SerializableFileHandler();
 
     /**
      * Initializes the main menu, setting up the background video
@@ -56,22 +61,33 @@ public class MainMenuController implements Initializable {
         addExplosionEffect(continueButton);
         addExplosionEffect(exitButton);
 
-        updateContinueButton(); //Habilitar o deshabilitar el boton de continaur si hay partida en memoria o no
+        //updateContinueButton();
     }
 
-    //Este es el metodo que use atras ve
-
+    /**
+     * Updates the continue button
+     */
     private void updateContinueButton() {
-        boolean hasSave = GameStateHolder.hasSavedGame();
-        continueButton.setDisable(!hasSave);
+        try {
+            GameState savedState = (GameState) serializableHandler.deserialize("game_save.dat");
+            boolean hasSave = (savedState != null);
 
-        if (!hasSave) {
+            continueButton.setDisable(!hasSave);
+
+            if (!hasSave) {
+                continueButton.setOpacity(0.5);
+            } else {
+                continueButton.setOpacity(1.0);
+            }
+
+            System.out.println((hasSave ? "✅" : "⚠️") + " Partida guardada: " + hasSave);
+
+        } catch (Exception e) {
+            // Si hay error al leer, asumir que no hay partida
+            continueButton.setDisable(true);
             continueButton.setOpacity(0.5);
-        } else {
-            continueButton.setOpacity(1.0);
+            System.out.println("⚠️ No se encontró partida guardada");
         }
-
-        System.out.println((hasSave ? "✅" : "⚠️") + " Partida en memoria: " + hasSave);
     }
 
     /**
@@ -288,11 +304,22 @@ public class MainMenuController implements Initializable {
      */
     @FXML
     private void onNewGame() {
-        GameStateHolder.clearSavedGame();
-
         stopVideo();
         System.out.println("Starting Game...");
-        loadGameView();
+
+        try {
+            GameView.deleteInstance();
+            GameView gameView = GameView.getInstance();
+
+            // ✅ Inicializar nuevo juego
+            gameView.getController().initializeNewGame();
+
+            Stage currentStage = (Stage) playButton.getScene().getWindow();
+            currentStage.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -301,13 +328,29 @@ public class MainMenuController implements Initializable {
      */
     @FXML
     private void onContinue() {
-        if (!GameStateHolder.hasSavedGame()){
-            System.err.println("No hay partida en memoria");
-            return;
-        }
         stopVideo();
         System.out.println("Loading Game...");
-        loadGameView();
+
+        GameState savedState = (GameState) serializableHandler.deserialize("game_save.dat");
+
+        if (savedState != null) {
+            try {
+                GameView.deleteInstance();
+                GameView gameView = GameView.getInstance();
+
+                // ✅ Cargar partida guardada
+                gameView.getController().loadSavedGame(savedState);
+
+                Stage currentStage = (Stage) continueButton.getScene().getWindow();
+                currentStage.close();
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } else {
+            System.out.println("❌ No se encontró partida guardada");
+            // Mostrar alerta al usuario
+        }
     }
 
     /**
@@ -325,8 +368,16 @@ public class MainMenuController implements Initializable {
      */
     public void stopVideo() {
         if (mediaPlayer != null) {
-            mediaPlayer.stop();
-            mediaPlayer.dispose();
+            try {
+                if (mediaPlayer.getStatus() != MediaPlayer.Status.DISPOSED) {
+                    mediaPlayer.stop();
+                }
+                mediaPlayer.dispose();
+            } catch (Exception e) {
+                System.err.println("⚠️ Error al detener video: " + e.getMessage());
+            } finally {
+                mediaPlayer = null;
+            }
         }
     }
 }

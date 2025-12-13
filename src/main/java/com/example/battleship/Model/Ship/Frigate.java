@@ -1,10 +1,12 @@
 package com.example.battleship.Model.Ship;
 
+import java.io.Serializable;
+
 /**
  * Frigate: a ship occupying a single cell (size = 1).
  * Tracks hits and sunken state.
  */
-public class Frigate implements IShip {
+public class Frigate implements IShip, Serializable {
     private boolean sunken;
     private int hitCount;
     private final int positionX;

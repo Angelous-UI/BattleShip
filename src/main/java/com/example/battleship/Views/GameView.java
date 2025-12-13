@@ -35,7 +35,7 @@ public class GameView extends Stage {
         setTitle("BattleShip Game");
         setResizable(false);
 
-        //cerrar vebntaba
+
         setOnCloseRequest(event ->{
             controller.stopVideo();
             Holder.INSTANCE=null;

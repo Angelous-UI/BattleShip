@@ -14,7 +14,7 @@ public class MainApplication extends Application {
 
     @Override
     public void start(Stage primaryStage) throws Exception {
-        MainMenuView.getInstance(); //Se obtiene la instancia singleton del menú principal
+        MainMenuView.getInstance();
 
     }
 

@@ -1,5 +1,6 @@
 package com.example.battleship.Model.Board;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -7,10 +8,8 @@ import java.util.Map;
  * Implementation of the {@link IBoard} interface using a HashMap-based
  * grid system. Each cell is identified by a string key formatted as "row,col".
  *
- * ⚠️ IMPORTANTE: Este Board ahora usa coordenadas 0-indexed (0-9)
- * para ser consistente con el sistema de canvas del GameController.
  */
-public class Board implements IBoard{
+public class Board implements IBoard, Serializable {
     private final int ROWS = 10;
     private final int COLS = 10;
 
@@ -18,7 +17,7 @@ public class Board implements IBoard{
 
     /**
      * Creates a 10x10 board and initializes all cells to 0.
-     * Coordenadas van de 0 a 9 (0-indexed)
+     *
      */
     public Board() {
         board = new HashMap<>();

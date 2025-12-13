@@ -44,22 +44,19 @@ public class SpriteSheet {
         WritableImage[] slices = new WritableImage[parts];
         PixelReader reader = sheet.getPixelReader();
 
-        // Obtener dimensiones de la imagen original
+        // Get the original image dimensions
         int imgWidth = (int) sheet.getWidth();
         int imgHeight = (int) sheet.getHeight();
 
-        System.out.println("📐 Imagen total: " + imgWidth + "x" + imgHeight);
-        System.out.println("   Cortando en " + parts + " partes (" +
-                (vertical ? "VERTICAL" : "HORIZONTAL") + ")");
 
         for (int i = 0; i < parts; i++) {
             int x, y, width, height;
 
             if (vertical) {
-                // Barco vertical: cortar la imagen horizontal en segmentos
-                // y rotarlos 90 grados
+                //Vertical ship
+                // Rotate 90 degrees
 
-                // Calcular el ancho de cada segmento de la imagen horizontal
+                // Calculate the width on each segment
                 int segmentWidth = imgWidth / parts;
 
                 x = i * segmentWidth;
@@ -67,16 +64,16 @@ public class SpriteSheet {
                 width = segmentWidth;
                 height = imgHeight;
 
-                // Extraer el segmento
+                // Extract the segment
                 WritableImage segment = new WritableImage(reader, x, y, width, height);
 
-                // Rotar el segmento 90 grados
+                //Rotate the segment 90 degrees
                 slices[i] = rotateImage(segment, 90);
 
             } else {
-                // Barco horizontal: cortar directamente en segmentos
+                //Horizontal ship
 
-                // Calcular el ancho de cada segmento
+                // Calculate the width on each segment
                 int segmentWidth = imgWidth / parts;
 
                 x = i * segmentWidth;
@@ -86,9 +83,6 @@ public class SpriteSheet {
 
                 slices[i] = new WritableImage(reader, x, y, width, height);
             }
-
-            System.out.println("   └─ Segmento " + i + ": desde (" + x + "," + y + ") " +
-                    "tamaño=" + width + "x" + height);
         }
 
         return slices;
@@ -105,16 +99,16 @@ public class SpriteSheet {
         int width = (int) source.getWidth();
         int height = (int) source.getHeight();
 
-        // Crear nueva imagen con dimensiones invertidas
+        // Create new imagen with inverted dimensions
         WritableImage rotated = new WritableImage(height, width);
 
         PixelReader reader = source.getPixelReader();
         var writer = rotated.getPixelWriter();
 
-        // Rotar 90 grados en sentido horario
+        // Rotate 90 degrees clockwise
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                // Mapeo: (x,y) -> (height-1-y, x)
+                // Mapping: (x,y) -> (height-1-y, x)
                 writer.setArgb(height - 1 - y, x, reader.getArgb(x, y));
             }
         }

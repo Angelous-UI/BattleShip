@@ -26,7 +26,7 @@ public class Coordinates {
      * The order after generation is deterministic before shuffle is applied.
      */
     private void generate() {
-        // genera TODAS las posiciones posibles (0..9, 0..9)
+        // generate all possible solutions (0..9, 0..9)
         for (int row = 0; row < 10; row++) {
             for (int col = 0; col < 10; col++) {
                 coordinates.add(new int[]{row, col});
