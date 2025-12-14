@@ -20,7 +20,7 @@
     <Label layoutX="280.0" layoutY="185.0" style="-fx-text-fill: #FFFFFF; -fx-font-size: 28px; -fx-font-weight: bold; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 5, 0.5, 0, 0);" text="📊 ESTADÍSTICAS DEL JUEGO" />
 
     <!-- Sección Jugador -->
-    <Label layoutX="180.0" layoutY="250.0" style="-fx-text-fill: #4CAF50; -fx-font-size: 22px; -fx-font-weight: bold; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 5, 0.5, 0, 0);" text="👤 JUGADOR" />
+    <Label fx:id="playerNameLabel" layoutX="180.0" layoutY="250.0" style="-fx-text-fill: #4CAF50; -fx-font-size: 22px; -fx-font-weight: bold; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 5, 0.5, 0, 0);" text="👤 JUGADOR" />
 
     <Label fx:id="playerShipsSunkLabel" layoutX="200.0" layoutY="285.0" style="-fx-text-fill: #FFFFFF; -fx-font-size: 18px; -fx-background-color: rgba(76, 175, 80, 0.3); -fx-padding: 8; -fx-background-radius: 5; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.6), 3, 0.5, 0, 0);" text="⚓ Barcos enemigos hundidos: 0/10" />
 

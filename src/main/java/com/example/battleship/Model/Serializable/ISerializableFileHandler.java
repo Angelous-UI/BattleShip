@@ -25,5 +25,5 @@ public interface ISerializableFileHandler {
      */
     Object deserialize(String fileName);
 
-    boolean delete(String fileName);
+    boolean delete(String filename);
 }
