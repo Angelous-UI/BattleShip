@@ -24,5 +24,8 @@ public interface IBoard {
      */
     int getCell(int row, int col);
 
+    /**
+     * Prints the board
+     */
     void printBoard();
 }

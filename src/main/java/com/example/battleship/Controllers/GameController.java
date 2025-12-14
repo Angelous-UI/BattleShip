@@ -3,8 +3,10 @@ package com.example.battleship.Controllers;
 import com.example.battleship.Model.Board.Board;
 import com.example.battleship.Model.Game.Game;
 import com.example.battleship.Model.Game.GameState;
+import com.example.battleship.Model.Player.PlayerData;
 import com.example.battleship.Model.Serializable.SerializableFileHandler;
 import com.example.battleship.Model.Ship.*;
+import com.example.battleship.Model.TextFile.PlaneTextFileHandler;
 import com.example.battleship.Model.Utils.SpriteSheet;
 import com.example.battleship.Views.GameView;
 import com.example.battleship.Views.MainMenuView;
@@ -116,7 +118,7 @@ public class GameController implements Initializable {
     /**
      * Flag controlling whether enemy ships are visible on the board.
      */
-    private boolean showEnemyShips = true;
+    private boolean showEnemyShips = false;
 
     /**
      * Graphics context for drawing on the player canvas.
@@ -244,6 +246,8 @@ public class GameController implements Initializable {
      * Handler for serializing and deserializing game state.
      */
     private SerializableFileHandler serializableHandler = new SerializableFileHandler();
+    private PlaneTextFileHandler plainTextFileHandler;
+    private PlayerData currentPlayerData;
 
 
     // ================= SPRITES =====================
@@ -285,6 +289,7 @@ public class GameController implements Initializable {
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
+        plainTextFileHandler = new PlaneTextFileHandler();
 
         if (gameExecutor != null && !gameExecutor.isShutdown()) {
             gameExecutor.shutdownNow();
@@ -305,8 +310,6 @@ public class GameController implements Initializable {
         missImage = new Image(getClass().getResource("/Battleship-Images/12.png").toExternalForm());
         hitImage = new Image(getClass().getResource("/Battleship-Images/11.png").toExternalForm());
         explosionImage = new Image(getClass().getResource("/Battleship-Images/13.png").toExternalForm());
-
-
 
         playerCanvas.setOnMouseMoved(this::previewShip);
         playerCanvas.setOnMouseClicked(this::placeShip);
@@ -329,16 +332,75 @@ public class GameController implements Initializable {
 
     }
 
-    public void initializeNewGame() {
+    public void initializeNewGame(String playerName) {
         game = new Game();
-        game.generateFleet(); // Genera la flota de la máquina
+        game.generateFleet();
 
         boardEnemy = game.getMachineBoard();
-
         drawEnemyFleet();
+
+        // Cargar o crear datos del jugador desde ARCHIVO PLANO
+        currentPlayerData = loadPlayerData(playerName);
+        if (currentPlayerData == null) {
+            currentPlayerData = new PlayerData(playerName);
+            System.out.println("📝 Nuevo jugador creado: " + playerName);
+        } else {
+            System.out.println("📂 Datos cargados: " + currentPlayerData);
+        }
 
         updateStatusLabel("📍 Coloca: Barco de 4 celdas");
         turnLabel.setText("COLOCANDO: 1/" + fleet.length);
+    }
+
+    private PlayerData loadPlayerData(String playerName) {
+        try {
+            String[] data = plainTextFileHandler.readFromFile("player_data.txt");
+
+            // Buscar el jugador en el archivo
+            for (int i = 0; i < data.length; i++) {
+                String[] fields = data[i].split(",");
+                if (fields.length >= 5 && fields[0].equals(playerName)) {
+                    return PlayerData.fromCSV(fields);
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("⚠️ No se pudieron cargar datos del jugador");
+        }
+        return null;
+    }
+
+    private void savePlayerData() {
+        try {
+            // Leer todos los jugadores existentes
+            String[] allData = plainTextFileHandler.readFromFile("player_data.txt");
+            StringBuilder content = new StringBuilder();
+
+            boolean playerFound = false;
+
+            // Actualizar jugador existente o agregar al final
+            for (String line : allData) {
+                if (!line.trim().isEmpty()) {
+                    String[] fields = line.split(",");
+                    if (fields.length >= 5 && fields[0].equals(currentPlayerData.getName())) {
+                        content.append(currentPlayerData.toCSV()).append("\n");
+                        playerFound = true;
+                    } else {
+                        content.append(line).append("\n");
+                    }
+                }
+            }
+
+            // Si es nuevo, agregarlo
+            if (!playerFound) {
+                content.append(currentPlayerData.toCSV()).append("\n");
+            }
+
+            plainTextFileHandler.writeToFile("player_data.txt", content.toString());
+            System.out.println("💾 Datos del jugador guardados (archivo plano)");
+
+        } catch (Exception e) {
+            System.err.println("❌ Error al guardar datos del jugador: " + e.getMessage());
+        }
     }
 
     public void loadSavedGame(GameState savedState) {
@@ -354,6 +416,12 @@ public class GameController implements Initializable {
         game.setCurrentPlayerIndex(savedState.getCurrentPlayerIndex());
         game.setCurrentState(savedState.getGamePhase());  // ✅ Usar getGamePhase()
         game.setGameOver(savedState.isGameOver());
+
+        // Cargar datos del jugador desde ARCHIVO PLANO
+        currentPlayerData = loadPlayerData(savedState.getPlayerName());
+        if (currentPlayerData == null) {
+            currentPlayerData = new PlayerData(savedState.getPlayerName());
+        }
 
         // Restaurar referencias locales
         boardEnemy = game.getMachineBoard();
@@ -393,14 +461,11 @@ public class GameController implements Initializable {
                     game.isGameOver()
             );
 
-            serializableHandler.serialize("game_save.dat", savedState);
+            if(game.hasHumanWon()) {
+                return;
+            }
 
-            Alert alert = createStyledAlert(Alert.AlertType.INFORMATION,
-                    "Partida Guardada",
-                    "✅ Éxito",
-                    "La partida se ha guardado correctamente.",
-                    "my-info-alert");
-            alert.showAndWait();
+            serializableHandler.serialize("game_save.dat", savedState);
 
         } catch (Exception e) {
             System.err.println("❌ Error guardando partida: " + e.getMessage());
@@ -853,8 +918,14 @@ public class GameController implements Initializable {
 
         if (game.isGameOver()) {
             System.out.println("🏁 JUEGO TERMINADO");
+            // ✅ ELIMINAR el archivo guardado
+            serializableHandler.delete("game_save.dat");
             endGame();
+            return;  // ⚠️ IMPORTANTE: salir sin guardar
         }
+
+        // ✅ Solo guarda si el juego sigue activo
+        saveGame();
     }
 
     private void scheduleAITurn() {
@@ -907,22 +978,44 @@ public class GameController implements Initializable {
     private void endGame() {
         isRunning = false;
 
-        Platform.runLater(() -> {
-            String message = game.hasHumanWon() ?
-                    "¡VICTORIA! Hundiste toda la flota enemiga" :
-                    "DERROTA. La máquina hundió toda tu flota";
+        // Actualizar estadísticas del jugador
+        currentPlayerData.incrementGamesPlayed();
+        currentPlayerData.addShots(game.getHumanShots().size());
 
+        // Contar hits
+        int hits = 0;
+        for (String shot : game.getHumanShots()) {
+            String[] coords = shot.split(",");
+            int row = Integer.parseInt(coords[0]);
+            int col = Integer.parseInt(coords[1]);
+            if (game.getMachineBoard().getCell(row, col) == 3) {
+                hits++;
+            }
+        }
+        currentPlayerData.addHits(hits);
+
+        Platform.runLater(() -> {
+            String message;
+            if (game.hasHumanWon()) {
+                currentPlayerData.incrementGamesWon();
+                message = "¡VICTORIA! Hundiste toda la flota enemiga\n\n" + currentPlayerData.toString();
+            } else {
+                message = "DERROTA. La máquina hundió toda tu flota\n\n" + currentPlayerData.toString();
+            }
+
+            // Guardar estadísticas en ARCHIVO PLANO
+            savePlayerData();
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
             alert.setTitle("Fin del juego");
             alert.setHeaderText(message);
             alert.setContentText("¿Quieres volver al menú principal?");
             alert.showAndWait();
-
             onBackMenu();
         });
     }
 
-    private void redrawEnemyBoard() {
+
+        private void redrawEnemyBoard() {
         // Limpia el canvas
         gEnemy.clearRect(0, 0, enemyCanvas.getWidth(), enemyCanvas.getHeight());
 
@@ -1196,20 +1289,24 @@ public class GameController implements Initializable {
             aiExecutor.shutdownNow();
         }
 
-        saveGame();
-
         stopVideo();
         System.out.println("Go back to main menu...");
         loadMainMenuView();
     }
 
+            @FXML
+            private Button helpButton;
 
+            @FXML
+            private void showHelp() {
 
-    @FXML
-    private void showHelp() {
-        String Title = "Ayuda - Batalla Naval";
-        String Header = "📋 Cómo jugar";
-        String rules = """
+                shakeButton(helpButton);
+                createExplosion(helpButton.getLayoutX() + helpButton.getWidth()/2,
+                        helpButton.getLayoutY() + helpButton.getHeight()/2);
+
+                String Title = "Ayuda - Batalla Naval";
+                String Header = "📋 Cómo jugar";
+                String rules = """
             Primero coloca todos los barcos (el juego avanza automáticamente al siguiente tipo):
             
             🚢 Flota disponible:
@@ -1227,10 +1324,10 @@ public class GameController implements Initializable {
             ⚔️ Cuando termines de colocar todos los barcos,
             podrás comenzar a atacar al enemigo.
             """;
-        Alert alert = createStyledAlert(Alert.AlertType.INFORMATION,Title,Header,rules,"my-info-alert");
-        alert.showAndWait();
+                Alert alert = createStyledAlert(Alert.AlertType.INFORMATION,Title,Header,rules,"my-info-alert");
+                alert.showAndWait();
 
-    }
+            }
 
     private Alert createStyledAlert(Alert.AlertType type, String title, String header, String content, String styleClass) {
         Alert alert = new Alert(type);
@@ -1254,19 +1351,22 @@ public class GameController implements Initializable {
         return alert;
     }
 
-    @FXML
-    private void toggleEnemyShips() {
-        showEnemyShips = !showEnemyShips;
-        redrawEnemyBoard();
+            @FXML
+            private void toggleEnemyShips() {
+                showEnemyShips = !showEnemyShips;
 
-        if (showEnemyShips) {
-            toggleShipsButton.setText("Ocultar Barcos");
-            System.out.println("👁️ Mostrando barcos enemigos");
-        } else {
-            toggleShipsButton.setText("Mostrar Barcos");
-            System.out.println("🙈 Ocultando barcos enemigos");
-        }
-    }
+                addExplosionEffect(toggleShipsButton);
+
+                redrawEnemyBoard();
+
+                if (showEnemyShips) {
+                    toggleShipsButton.setText("Ocultar Barcos");
+                    System.out.println("👁️ Mostrando barcos enemigos");
+                } else {
+                    toggleShipsButton.setText("Mostrar Barcos");
+                    System.out.println("🙈 Ocultando barcos enemigos");
+                }
+            }
 
     public static class BoardRenderer {
 

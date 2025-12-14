@@ -1,5 +1,6 @@
 package com.example.battleship.Controllers;
 
+import com.example.battleship.Model.Game.Game;
 import com.example.battleship.Model.Game.GameState;
 import com.example.battleship.Model.Serializable.SerializableFileHandler;
 import com.example.battleship.Model.TextFile.IPlaneTextFileHandler;
@@ -8,6 +9,7 @@ import javafx.animation.*;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.media.Media;
@@ -20,6 +22,7 @@ import javafx.util.Duration;
 import com.example.battleship.Views.GameView;
 /*import com.example.battleship.Model.Game.GameStateHolder;*/
 
+import java.io.File;
 import java.net.URL;
 import java.util.Random;
 import java.util.ResourceBundle;
@@ -47,7 +50,7 @@ public class MainMenuController implements Initializable {
 
     private MediaPlayer mediaPlayer;
     private Stage stage;
-    IPlaneTextFileHandler planeTextFileReader;
+
     private SerializableFileHandler serializableHandler = new SerializableFileHandler();
 
     /**
@@ -312,7 +315,7 @@ public class MainMenuController implements Initializable {
             GameView gameView = GameView.getInstance();
 
             // ✅ Inicializar nuevo juego
-            gameView.getController().initializeNewGame();
+            gameView.getController().initializeNewGame("player");
 
             Stage currentStage = (Stage) playButton.getScene().getWindow();
             currentStage.close();
@@ -328,12 +331,13 @@ public class MainMenuController implements Initializable {
      */
     @FXML
     private void onContinue() {
-        stopVideo();
         System.out.println("Loading Game...");
 
         GameState savedState = (GameState) serializableHandler.deserialize("game_save.dat");
 
         if (savedState != null) {
+            System.out.println(savedState.getGamePhase());
+            stopVideo();
             try {
                 GameView.deleteInstance();
                 GameView gameView = GameView.getInstance();
@@ -352,6 +356,17 @@ public class MainMenuController implements Initializable {
             // Mostrar alerta al usuario
         }
     }
+
+    private void showAlert(Alert.AlertType type, String title, String header, String content) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(type);
+            alert.setTitle(title);
+            alert.setHeaderText(header);
+            alert.setContentText(content);
+            alert.showAndWait();
+        });
+    }
+
 
     /**
      * Handles the "Exit" button action.

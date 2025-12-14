@@ -539,8 +539,10 @@ public class Game implements IGame {
         long humanShipsSunk = humanFleet.stream().filter(IShip::isSunken).count();
         long machineShipsSunk = machineFleet.stream().filter(IShip::isSunken).count();
 
-        if (humanShipsSunk == humanFleet.size() ||
-                machineShipsSunk == machineFleet.size()) {
+        if (humanShipsSunk == humanFleet.size()) {
+            gameOver = true;
+            currentState = GameState.FINISHED;
+        } else if (machineShipsSunk == machineFleet.size()) {
             gameOver = true;
             currentState = GameState.FINISHED;
         }

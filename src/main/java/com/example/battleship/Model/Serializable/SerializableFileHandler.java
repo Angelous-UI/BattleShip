@@ -48,4 +48,23 @@ public class SerializableFileHandler implements ISerializableFileHandler {
             return null;
         }
     }
+
+    @Override
+    public boolean delete(String fileName) {
+        try {
+            File file = new File(fileName);
+
+            if (file.exists()) {
+                boolean deleted = file.delete();
+                if (deleted) {
+                    System.out.println("🗑️ Archivo eliminado: " + fileName);
+                }
+                return deleted;
+            }
+            return false;
+        } catch (Exception e) {
+            System.err.println("❌ Error al eliminar: " + e.getMessage());
+            return false;
+        }
+    }
 }
