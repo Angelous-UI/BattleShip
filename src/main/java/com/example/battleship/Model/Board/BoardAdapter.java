@@ -15,32 +15,6 @@ package com.example.battleship.Model.Board;
  */
 public abstract class BoardAdapter implements IBoard {
 
-    /**
-     * The wrapped Board instance that handles the actual storage and operations.
-     */
-    private final Board board;
-
-    /**
-     * Creates a new BoardAdapter wrapping a new Board instance.
-     * The internal board is initialized with a 10x10 grid of zeros.
-     */
-    public BoardAdapter() {
-        this.board = new Board();
-    }
-
-    /**
-     * Creates a new BoardAdapter wrapping an existing Board instance.
-     * This constructor allows you to adapt an already-created board.
-     *
-     * @param board the board instance to wrap and adapt
-     * @throws NullPointerException if board is null
-     */
-    public BoardAdapter(Board board) {
-        if (board == null) {
-            throw new NullPointerException("Board cannot be null");
-        }
-        this.board = board;
-    }
 
     /**
      * Sets a value in the board at the given coordinates.
@@ -52,7 +26,7 @@ public abstract class BoardAdapter implements IBoard {
      */
     @Override
     public void setCell(int row, int col, int value) {
-        board.setCell(row, col, value);
+        // Default nothing
     }
 
     /**
@@ -65,7 +39,7 @@ public abstract class BoardAdapter implements IBoard {
      */
     @Override
     public int getCell(int row, int col) {
-        return board.getCell(row, col);
+        return 0;
     }
 
     /**
@@ -74,7 +48,7 @@ public abstract class BoardAdapter implements IBoard {
      */
     @Override
     public void printBoard() {
-        board.printBoard();
+        // Default nothing
     }
 
     /**
@@ -84,6 +58,6 @@ public abstract class BoardAdapter implements IBoard {
      * @return the wrapped Board instance
      */
     protected Board getBoard() {
-        return board;
+        return null;
     }
 }

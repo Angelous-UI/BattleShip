@@ -6,7 +6,7 @@ import java.io.Serializable;
  * Destroyer: a ship occupying two cells (size = 2).
  * Keeps track of hits and sunken state.
  */
-public class Destroyer implements IShip, Serializable {
+public class Destroyer extends ShipAdapter implements Serializable {
     private boolean sunken;
     private int hitCount;
     private final int positionX;

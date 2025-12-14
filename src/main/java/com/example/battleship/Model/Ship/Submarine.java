@@ -6,7 +6,7 @@ import java.io.Serializable;
  * Submarine: a ship occupying three cells (size = 3).
  * Maintains hit counting and sunken flag.
  */
-public class Submarine implements IShip, Serializable {
+public class Submarine extends ShipAdapter implements Serializable {
     private boolean sunken;
     private int hitCount;
     private final int positionX;

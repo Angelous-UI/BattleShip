@@ -15,25 +15,6 @@ package com.example.battleship.Model.Ship;
 public abstract class ShipAdapter implements IShip {
 
     /**
-     * The wrapped IShip instance that handles the actual ship logic.
-     */
-    private final IShip ship;
-
-    /**
-     * Creates a new ShipAdapter wrapping the given ship instance.
-     * The adapter will delegate all method calls to this ship unless overridden.
-     *
-     * @param ship the ship to wrap and adapt
-     * @throws NullPointerException if ship is null
-     */
-    public ShipAdapter(IShip ship) {
-        if (ship == null) {
-            throw new NullPointerException("Ship cannot be null");
-        }
-        this.ship = ship;
-    }
-
-    /**
      * Returns whether the ship has been sunk.
      * <p>Default implementation delegates to the wrapped ship.</p>
      *
@@ -41,7 +22,7 @@ public abstract class ShipAdapter implements IShip {
      */
     @Override
     public boolean isSunken() {
-        return ship.isSunken();
+        return false;
     }
 
     /**
@@ -50,7 +31,7 @@ public abstract class ShipAdapter implements IShip {
      */
     @Override
     public void registerHit() {
-        ship.registerHit();
+        // Default
     }
 
     /**
@@ -61,7 +42,7 @@ public abstract class ShipAdapter implements IShip {
      */
     @Override
     public int getRow() {
-        return ship.getRow();
+        return 0;
     }
 
     /**
@@ -72,7 +53,7 @@ public abstract class ShipAdapter implements IShip {
      */
     @Override
     public int getCol() {
-        return ship.getCol();
+        return 0;
     }
 
     /**
@@ -83,7 +64,7 @@ public abstract class ShipAdapter implements IShip {
      */
     @Override
     public int getShipSize() {
-        return ship.getShipSize();
+        return 0;
     }
 
     /**
@@ -94,7 +75,7 @@ public abstract class ShipAdapter implements IShip {
      */
     @Override
     public Direction getDirection() {
-        return ship.getDirection();
+        return null;
     }
 
     /**
@@ -105,7 +86,7 @@ public abstract class ShipAdapter implements IShip {
      */
     @Override
     public int getHitCount() {
-        return ship.getHitCount();
+        return 0;
     }
 
     /**
@@ -115,6 +96,6 @@ public abstract class ShipAdapter implements IShip {
      * @return the wrapped IShip instance
      */
     protected IShip getShip() {
-        return ship;
+        return null;
     }
 }

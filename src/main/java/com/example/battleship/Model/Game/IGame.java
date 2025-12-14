@@ -78,6 +78,7 @@ public interface IGame {
      * Prints the board coordinates of every ship in the fleet.
      */
     void printFleetCoordinates();
+
     /**
      * Returns the list of ships currently placed on the board.
      *
@@ -85,10 +86,62 @@ public interface IGame {
      */
     public List<IShip> getMachineFleet();
 
-    public Human getHuman();
+    /**
+     * Retrieves the human player instance participating in the game.
+     *
+     * <p>This method provides access to the human player object, which contains
+     * player-specific data such as name, shot history, and game statistics.</p>
+     *
+     * @return the human player instance, or {@code null} if no human player exists
+     */
+    Human getHuman();
 
-
+    /**
+     * Returns the current state of the game.
+     *
+     * <p>The game state indicates which phase the game is currently in:</p>
+     * <ul>
+     *   <li>{@link Game.GameState#SETUP} - Players are placing their ships</li>
+     *   <li>{@link Game.GameState#PLAYING} - Active gameplay with turn-based shooting</li>
+     *   <li>{@link Game.GameState#FINISHED} - Game has concluded with a winner</li>
+     * </ul>
+     *
+     * <p>This method is useful for:
+     * <ul>
+     *   <li>Determining which UI elements to display</li>
+     *   <li>Validating whether certain actions are allowed</li>
+     *   <li>Implementing state-specific game logic</li>
+     * </ul>
+     * </p>
+     *
+     * @return the current {@link Game.GameState}, or {@code null} if not initialized
+     * @see Game.GameState
+     */
     Game.GameState getCurrentState();
 
+    /**
+     * Retrieves the AI instance controlling the machine player's behavior.
+     *
+     * <p>This method provides direct access to the {@link SmartAI} object that
+     * manages the computer opponent's decision-making, including:</p>
+     * <ul>
+     *   <li>Shot selection strategies (HUNT and TARGET modes)</li>
+     *   <li>Hit tracking and ship pursuit logic</li>
+     *   <li>Probability-based targeting using heat maps</li>
+     * </ul>
+     *
+     * <p><b>Common use cases:</b></p>
+     * <ul>
+     *   <li>Registering shot results: {@code getSmartAI().registerResult(row, col, hit, sunk)}</li>
+     *   <li>Requesting next AI move: {@code getSmartAI().getNextShot()}</li>
+     *   <li>Resetting AI state: {@code getSmartAI().reset()}</li>
+     *   <li>Debugging AI behavior: {@code getSmartAI().getDebugInfo()}</li>
+     * </ul>
+     *
+     * @return the {@link SmartAI} instance, or {@code null} if AI is not initialized
+     * @see SmartAI
+     * @see SmartAI#getNextShot()
+     * @see SmartAI#registerResult(int, int, boolean, boolean)
+     */
     SmartAI getSmartAI();
 }

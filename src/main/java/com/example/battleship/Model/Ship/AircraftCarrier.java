@@ -6,7 +6,7 @@ import java.io.Serializable;
  * AircraftCarrier: a ship occupying four cells (size = 4).
  * Tracks registered hits and sunken state.
  */
-public class AircraftCarrier implements IShip, Serializable {
+public class AircraftCarrier extends ShipAdapter implements Serializable {
     private boolean sunken;
     private int hitCount;
     private final int positionX;

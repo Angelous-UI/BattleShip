@@ -20,11 +20,11 @@ import java.util.*;
  * </p>
  *
  * <p>
- * It implements {@link IGame} and encapsulates the full gameplay lifecycle:
+ * It extends {@link GameAdapter} and encapsulates the full gameplay lifecycle:
  * setup, playing phase, and game termination.
  * </p>
  */
-public class Game implements IGame {
+public class Game extends GameAdapter {
 
     /** Human player instance. */
     private Human human;

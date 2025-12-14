@@ -9,7 +9,7 @@ import java.util.Map;
  * grid system. Each cell is identified by a string key formatted as "row,col".
  *
  */
-public class Board implements IBoard, Serializable {
+public class Board extends BoardAdapter implements Serializable {
     private final int ROWS = 10;
     private final int COLS = 10;
 

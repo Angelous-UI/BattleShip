@@ -31,34 +31,22 @@ public class SmartAI {
      * Represents the current operational mode of the AI.
      */
     private enum Mode {
-        /**
-         * General search mode with no active hits
-         */
+        /** General search mode with no active hits */
         HUNT,
-        /**
-         * Focused attack mode when at least one hit exists
-         */
+        /** Focused attack mode when at least one hit exists */
         TARGET
     }
 
-    /**
-     * Current operational mode
-     */
+    /** Current operational mode */
     private Mode currentMode = Mode.HUNT;
 
-    /**
-     * Priority queue containing candidate target cells
-     */
+    /** Priority queue containing candidate target cells */
     private final PriorityQueue<ScoredCell> targetQueue = new PriorityQueue<>();
 
-    /**
-     * List of all active hits (may belong to multiple ships)
-     */
+    /** List of all active hits (may belong to multiple ships) */
     private final List<int[]> currentShipHits = new ArrayList<>();
 
-    /**
-     * History of all fired shots to prevent duplicates
-     */
+    /** History of all fired shots to prevent duplicates */
     private final Set<String> shotHistory = new HashSet<>();
 
     /**
@@ -72,14 +60,10 @@ public class SmartAI {
      */
     private final int[][] knownBoard = new int[10][10];
 
-    /**
-     * Remaining ships indexed by size: [0]=frigates(1), [1]=destroyers(2), [2]=submarines(3), [3]=carriers(4)
-     */
+    /** Remaining ships indexed by size: [0]=frigates(1), [1]=destroyers(2), [2]=submarines(3), [3]=carriers(4) */
     private final int[] remainingShips = {4, 3, 2, 1};
 
-    /**
-     * Probability heat map used during HUNT mode
-     */
+    /** Probability heat map used during HUNT mode */
     private final int[][] heatMap = new int[10][10];
 
     /**
@@ -89,26 +73,20 @@ public class SmartAI {
      * so that higher-scored cells are selected first.</p>
      */
     private static class ScoredCell implements Comparable<ScoredCell> {
-        /**
-         * Row index of the cell
-         */
+        /** Row index of the cell */
         int row;
 
-        /**
-         * Column index of the cell
-         */
+        /** Column index of the cell */
         int col;
 
-        /**
-         * Priority score (higher means more desirable)
-         */
+        /** Priority score (higher means more desirable) */
         int score;
 
         /**
          * Constructs a scored cell.
          *
-         * @param row   row index (0–9)
-         * @param col   column index (0–9)
+         * @param row row index (0–9)
+         * @param col column index (0–9)
          * @param score priority score
          */
         ScoredCell(int row, int col, int score) {
@@ -134,34 +112,22 @@ public class SmartAI {
      */
     private enum Direction {
 
-        /**
-         * Upward direction (decreasing row)
-         */
+        /** Upward direction (decreasing row) */
         NORTH(-1, 0),
 
-        /**
-         * Downward direction (increasing row)
-         */
+        /** Downward direction (increasing row) */
         SOUTH(1, 0),
 
-        /**
-         * Right direction (increasing column)
-         */
+        /** Right direction (increasing column) */
         EAST(0, 1),
 
-        /**
-         * Left direction (decreasing column)
-         */
+        /** Left direction (decreasing column) */
         WEST(0, -1);
 
-        /**
-         * Row delta
-         */
+        /** Row delta */
         final int dr;
 
-        /**
-         * Column delta
-         */
+        /** Column delta */
         final int dc;
 
         /**
@@ -181,7 +147,7 @@ public class SmartAI {
          * @return opposite direction
          */
         Direction opposite() {
-            return switch (this) {
+            return switch(this) {
                 case NORTH -> SOUTH;
                 case SOUTH -> NORTH;
                 case EAST -> WEST;
@@ -204,10 +170,10 @@ public class SmartAI {
      * @return an integer array {row, col} representing the next shot coordinates
      */
     public int[] getNextShot() {
-        System.out.println("\n🎯 [IA] ========== OBTENIENDO DISPARO ==========");
-        System.out.println("   Hits activos totales: " + currentShipHits.size());
+        System.out.println("\n🎯 [AI] ========== GETTING SHOT ==========");
+        System.out.println("   Total active hits: " + currentShipHits.size());
         if (!currentShipHits.isEmpty()) {
-            System.out.print("   Posiciones: ");
+            System.out.print("   Positions: ");
             for (int[] hit : currentShipHits) {
                 System.out.print("(" + hit[0] + "," + hit[1] + ") ");
             }
@@ -217,43 +183,43 @@ public class SmartAI {
         int[] shot = null;
 
         if (!currentShipHits.isEmpty()) {
-            System.out.println("   🔥 MODO TARGET ACTIVO");
+            System.out.println("   🔥 TARGET MODE ACTIVE");
             currentMode = Mode.TARGET;
 
             shot = pollValidTarget();
 
             if (shot == null) {
-                System.out.println("   📋 Regenerando targets...");
+                System.out.println("   📋 Regenerating targets...");
                 generateSmartTargets();
                 shot = pollValidTarget();
             }
 
             if (shot == null) {
-                System.out.println("   🔍 Explorando adyacentes...");
+                System.out.println("   🔍 Exploring adjacent cells...");
                 shot = exploreAllAdjacent();
             }
 
             if (shot == null) {
-                System.out.println("   ♟️ Patrón expandido...");
+                System.out.println("   ♟️ Expanded pattern...");
                 shot = findNearbyCell();
             }
 
             if (shot == null) {
-                System.out.println("   ⚠️ Recurso aleatorio");
+                System.out.println("   ⚠️ Random fallback");
                 shot = getRandomAvailableCell();
             }
 
         } else {
-            System.out.println("   🔎 MODO HUNT");
+            System.out.println("   🔎 HUNT MODE");
             shot = getHuntModeShot();
         }
 
         if (shot == null) {
-            System.err.println("   ❌ ERROR: fallback extremo");
+            System.err.println("   ❌ ERROR: extreme fallback");
             shot = new int[]{0, 0};
         }
 
-        System.out.println("   ✅ DISPARO: (" + shot[0] + "," + shot[1] + ")");
+        System.out.println("   ✅ SHOT: (" + shot[0] + "," + shot[1] + ")");
         System.out.println("===============================================\n");
 
         shotHistory.add(shot[0] + "," + shot[1]);
@@ -269,7 +235,7 @@ public class SmartAI {
      * @return coordinates {row, col} of the next valid target, or null if queue is empty
      */
     private int[] pollValidTarget() {
-        System.out.println("      🎯 Cola size: " + targetQueue.size());
+        System.out.println("      🎯 Queue size: " + targetQueue.size());
 
         while (!targetQueue.isEmpty()) {
             ScoredCell cell = targetQueue.poll();
@@ -280,7 +246,7 @@ public class SmartAI {
             }
         }
 
-        System.out.println("      ❌ Sin targets válidos");
+        System.out.println("      ❌ No valid targets");
         return null;
     }
 
@@ -299,13 +265,13 @@ public class SmartAI {
                 int newCol = hit[1] + dir.dc;
 
                 if (isValidTarget(newRow, newCol)) {
-                    System.out.println("      ✅ Adyacente: (" + newRow + "," + newCol + ")");
+                    System.out.println("      ✅ Adjacent: (" + newRow + "," + newCol + ")");
                     return new int[]{newRow, newCol};
                 }
             }
         }
 
-        System.out.println("      ❌ Sin adyacentes");
+        System.out.println("      ❌ No adjacent cells");
         return null;
     }
 
@@ -324,14 +290,14 @@ public class SmartAI {
                     int newCol = hit[1] + dc;
 
                     if (isValidTarget(newRow, newCol)) {
-                        System.out.println("      ✅ Cercana: (" + newRow + "," + newCol + ")");
+                        System.out.println("      ✅ Nearby: (" + newRow + "," + newCol + ")");
                         return new int[]{newRow, newCol};
                     }
                 }
             }
         }
 
-        System.out.println("      ❌ Sin celdas cercanas");
+        System.out.println("      ❌ No nearby cells");
         return null;
     }
 
@@ -357,22 +323,22 @@ public class SmartAI {
      * <p>This method updates the AI's internal state based on whether
      * the shot was a hit or miss, and whether it sunk a ship.</p>
      *
-     * @param row  row coordinate of the shot
-     * @param col  column coordinate of the shot
-     * @param hit  true if the shot hit a ship, false if it was a miss
+     * @param row row coordinate of the shot
+     * @param col column coordinate of the shot
+     * @param hit true if the shot hit a ship, false if it was a miss
      * @param sunk true if the shot sunk a ship, false otherwise
      */
     public void registerResult(int row, int col, boolean hit, boolean sunk) {
-        System.out.println("\n📊 [IA] ========== RESULTADO ==========");
+        System.out.println("\n📊 [AI] ========== RESULT ==========");
         System.out.println("   Pos: (" + row + "," + col + ") | Hit: " + hit + " | Sunk: " + sunk);
 
         if (!hit) {
             knownBoard[row][col] = 1;
-            System.out.println("   💧 AGUA - manteniendo " + currentShipHits.size() + " hits");
+            System.out.println("   💧 WATER - maintaining " + currentShipHits.size() + " hits");
             return;
         }
 
-        // IMPACTO
+        // HIT
         knownBoard[row][col] = 2;
 
         boolean exists = currentShipHits.stream()
@@ -380,16 +346,16 @@ public class SmartAI {
 
         if (!exists) {
             currentShipHits.add(new int[]{row, col});
-            System.out.println("   💥 NUEVO HIT agregado!");
+            System.out.println("   💥 NEW HIT added!");
         }
 
         System.out.println("   📍 Total hits: " + currentShipHits.size());
 
         if (sunk) {
-            System.out.println("   🔥 BARCO HUNDIDO!");
+            System.out.println("   🔥 SHIP SUNK!");
             handleSunkShip(row, col);
         } else {
-            System.out.println("   ⚠️ NO hundido - continuando");
+            System.out.println("   ⚠️ NOT sunk - continuing");
             currentMode = Mode.TARGET;
             targetQueue.clear();
             generateSmartTargets();
@@ -409,38 +375,38 @@ public class SmartAI {
      * @param lastHitCol column coordinate of the final hit that sunk the ship
      */
     private void handleSunkShip(int lastHitRow, int lastHitCol) {
-        System.out.println("   🔍 Identificando barco hundido...");
+        System.out.println("   🔍 Identifying sunk ship...");
 
-        // Encontrar todos los hits conectados al último disparo (el barco hundido)
+        // Find all connected hits to the last shot (the sunk ship)
         Set<String> sunkShipCells = findConnectedShip(lastHitRow, lastHitCol);
 
-        System.out.println("   🔥 Barco hundido tiene " + sunkShipCells.size() + " celdas:");
+        System.out.println("   🔥 Sunk ship has " + sunkShipCells.size() + " cells:");
         for (String cell : sunkShipCells) {
             System.out.println("      - " + cell);
         }
 
-        // Marcar como hundido
+        // Mark as sunk
         for (String cell : sunkShipCells) {
             String[] parts = cell.split(",");
             int r = Integer.parseInt(parts[0]);
             int c = Integer.parseInt(parts[1]);
             knownBoard[r][c] = 3;
 
-            // Marcar adyacentes de este barco como imposibles
+            // Mark adjacent cells of this ship as impossible
             markAdjacentAsImpossible(r, c);
         }
 
-        // ✅ SOLO remover los hits del barco hundido
+        // ✅ ONLY remove hits from the sunk ship
         currentShipHits.removeIf(hit -> {
             String key = hit[0] + "," + hit[1];
             return sunkShipCells.contains(key);
         });
 
-        System.out.println("   🧹 Hits restantes después de limpiar: " + currentShipHits.size());
+        System.out.println("   🧹 Remaining hits after cleanup: " + currentShipHits.size());
 
         if (!currentShipHits.isEmpty()) {
-            System.out.println("   ⚠️ AÚN HAY HITS ACTIVOS - manteniendo TARGET mode");
-            System.out.print("   Hits restantes: ");
+            System.out.println("   ⚠️ STILL ACTIVE HITS - maintaining TARGET mode");
+            System.out.print("   Remaining hits: ");
             for (int[] hit : currentShipHits) {
                 System.out.print("(" + hit[0] + "," + hit[1] + ") ");
             }
@@ -449,16 +415,16 @@ public class SmartAI {
             targetQueue.clear();
             generateSmartTargets();
         } else {
-            System.out.println("   ✅ No hay más hits - volviendo a HUNT");
+            System.out.println("   ✅ No more hits - returning to HUNT");
             currentMode = Mode.HUNT;
             targetQueue.clear();
         }
 
-        // Actualizar contador de barcos
+        // Update ship counter
         int shipSize = sunkShipCells.size();
         if (shipSize >= 1 && shipSize <= 4) {
             remainingShips[shipSize - 1]--;
-            System.out.println("   📊 Barcos restantes: " + Arrays.toString(remainingShips));
+            System.out.println("   📊 Remaining ships: " + Arrays.toString(remainingShips));
         }
     }
 
@@ -484,13 +450,13 @@ public class SmartAI {
             int row = current[0];
             int col = current[1];
 
-            // Revisar las 4 direcciones adyacentes
+            // Check the 4 adjacent directions
             for (Direction dir : Direction.values()) {
                 int newRow = row + dir.dr;
                 int newCol = col + dir.dc;
                 String key = newRow + "," + newCol;
 
-                // Si es un hit (2) o hundido (3) y no lo hemos visitado
+                // If it's a hit (2) or sunk (3) and we haven't visited it
                 if (isValidCell(newRow, newCol) &&
                         !visited.contains(key) &&
                         (knownBoard[newRow][newCol] == 2 || knownBoard[newRow][newCol] == 3)) {
@@ -536,18 +502,18 @@ public class SmartAI {
      */
     private void generateSmartTargets() {
         targetQueue.clear();
-        System.out.println("      🎯 Generando targets para " + currentShipHits.size() + " hits");
+        System.out.println("      🎯 Generating targets for " + currentShipHits.size() + " hits");
 
         if (currentShipHits.isEmpty()) return;
 
-        // Agrupar hits en posibles barcos diferentes
+        // Group hits into possible different ships
         List<List<int[]>> shipGroups = groupHitsByProximity();
 
-        System.out.println("      📊 Grupos de barcos detectados: " + shipGroups.size());
+        System.out.println("      📊 Ship groups detected: " + shipGroups.size());
 
-        // Generar targets para cada grupo
+        // Generate targets for each group
         for (List<int[]> group : shipGroups) {
-            System.out.println("         Grupo con " + group.size() + " hits");
+            System.out.println("         Group with " + group.size() + " hits");
             generateTargetsForGroup(group);
         }
 
@@ -577,7 +543,7 @@ public class SmartAI {
             processed.add(key);
             group.add(hit);
 
-            // BFS para encontrar hits conectados
+            // BFS to find connected hits
             while (!queue.isEmpty()) {
                 int[] current = queue.poll();
 
@@ -588,7 +554,7 @@ public class SmartAI {
 
                     if (processed.contains(newKey)) continue;
 
-                    // Buscar si hay un hit en esta posición
+                    // Search if there's a hit at this position
                     for (int[] otherHit : currentShipHits) {
                         if (otherHit[0] == newRow && otherHit[1] == newCol) {
                             processed.add(newKey);
@@ -616,7 +582,7 @@ public class SmartAI {
      */
     private void generateTargetsForGroup(List<int[]> group) {
         if (group.size() == 1) {
-            // Un solo hit - las 4 direcciones
+            // Single hit - 4 directions
             int[] hit = group.get(0);
             for (Direction dir : Direction.values()) {
                 int newRow = hit[0] + dir.dr;
@@ -626,7 +592,7 @@ public class SmartAI {
                 }
             }
         } else {
-            // Múltiples hits - determinar orientación
+            // Multiple hits - determine orientation
             Direction orientation = determineOrientationForGroup(group);
 
             if (orientation != null) {
@@ -635,7 +601,7 @@ public class SmartAI {
                 addExtremeCells(firstHit, orientation.opposite(), 200);
                 addExtremeCells(lastHit, orientation, 200);
             } else {
-                // Sin orientación clara - explorar todo
+                // No clear orientation - explore all
                 for (int[] hit : group) {
                     for (Direction dir : Direction.values()) {
                         int newRow = hit[0] + dir.dr;
@@ -666,7 +632,7 @@ public class SmartAI {
         if (group.stream().allMatch(h -> h[0] == firstRow)) {
             List<int[]> sorted = new ArrayList<>(group);
             sorted.sort(Comparator.comparingInt(a -> a[1]));
-            return sorted.get(0)[1] < sorted.get(sorted.size() - 1)[1] ? Direction.EAST : Direction.WEST;
+            return sorted.get(0)[1] < sorted.get(sorted.size()-1)[1] ? Direction.EAST : Direction.WEST;
         }
 
         // Vertical
@@ -674,7 +640,7 @@ public class SmartAI {
         if (group.stream().allMatch(h -> h[1] == firstCol)) {
             List<int[]> sorted = new ArrayList<>(group);
             sorted.sort(Comparator.comparingInt(a -> a[0]));
-            return sorted.get(0)[0] < sorted.get(sorted.size() - 1)[0] ? Direction.SOUTH : Direction.NORTH;
+            return sorted.get(0)[0] < sorted.get(sorted.size()-1)[0] ? Direction.SOUTH : Direction.NORTH;
         }
 
         return null;
@@ -684,25 +650,17 @@ public class SmartAI {
      * Finds the extreme (furthest) hit in a group in a given direction.
      *
      * @param group list of hit coordinates
-     * @param dir   direction to search for the extreme
+     * @param dir direction to search for the extreme
      * @return coordinates of the extreme hit
      */
     private int[] findExtremeInGroup(List<int[]> group, Direction dir) {
         int[] extreme = group.get(0);
         for (int[] hit : group) {
             switch (dir) {
-                case NORTH -> {
-                    if (hit[0] < extreme[0]) extreme = hit;
-                }
-                case SOUTH -> {
-                    if (hit[0] > extreme[0]) extreme = hit;
-                }
-                case WEST -> {
-                    if (hit[1] < extreme[1]) extreme = hit;
-                }
-                case EAST -> {
-                    if (hit[1] > extreme[1]) extreme = hit;
-                }
+                case NORTH -> { if (hit[0] < extreme[0]) extreme = hit; }
+                case SOUTH -> { if (hit[0] > extreme[0]) extreme = hit; }
+                case WEST -> { if (hit[1] < extreme[1]) extreme = hit; }
+                case EAST -> { if (hit[1] > extreme[1]) extreme = hit; }
             }
         }
         return extreme;
@@ -712,8 +670,8 @@ public class SmartAI {
      * Adds cells at the extremes of a ship group to the target queue.
      *
      * @param extreme coordinates of the extreme hit
-     * @param dir     direction to extend from the extreme
-     * @param score   priority score for the new target
+     * @param dir direction to extend from the extreme
+     * @param score priority score for the new target
      */
     private void addExtremeCells(int[] extreme, Direction dir, int score) {
         int newRow = extreme[0] + dir.dr;
@@ -781,9 +739,9 @@ public class SmartAI {
     /**
      * Checks if a ship of given size can be placed at the specified position.
      *
-     * @param row        starting row
-     * @param col        starting column
-     * @param size       ship size
+     * @param row starting row
+     * @param col starting column
+     * @param size ship size
      * @param horizontal true for horizontal placement, false for vertical
      * @return true if placement is valid, false otherwise
      */
@@ -838,12 +796,12 @@ public class SmartAI {
         return row >= 0 && row < 10 && col >= 0 && col < 10;
     }
 
-
     /**
      * Resets the AI to its initial state.
      *
      * <p>Clears all tracking data, resets ship counts, and
-     * reinitializes the knowledge board and heat map.</p> */
+     * reinitializes the knowledge board and heat map.</p>
+     */
     public void reset() {
         currentMode = Mode.HUNT;
         targetQueue.clear();
@@ -857,10 +815,15 @@ public class SmartAI {
         }
     }
 
+/**
+ * Returns debug information about the current AI state.
+ *
+ * @return formatted string with mode, queue size, active hits,
+ * and remaining ships
+ * */
     public String getDebugInfo() {
         return String.format("Mode: %s | Queue: %d | Hits: %d | Ships: %s",
                 currentMode, targetQueue.size(), currentShipHits.size(),
                 Arrays.toString(remainingShips));
     }
-
 }

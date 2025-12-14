@@ -21,25 +21,6 @@ import java.util.List;
 public abstract class PlayerAdapter implements IPlayer {
 
     /**
-     * The wrapped IPlayer instance that handles the actual player logic.
-     */
-    private final IPlayer player;
-
-    /**
-     * Creates a new PlayerAdapter wrapping the given player instance.
-     * The adapter will delegate all method calls to this player unless overridden.
-     *
-     * @param player the player to wrap and adapt
-     * @throws NullPointerException if player is null
-     */
-    public PlayerAdapter(IPlayer player) {
-        if (player == null) {
-            throw new NullPointerException("Player cannot be null");
-        }
-        this.player = player;
-    }
-
-    /**
      * Registers a shot made by this player.
      * <p>Default implementation delegates to the wrapped player.</p>
      *
@@ -48,7 +29,7 @@ public abstract class PlayerAdapter implements IPlayer {
      */
     @Override
     public void shoot(int positionX, int positionY) {
-        player.shoot(positionX, positionY);
+        // Default nothing
     }
 
     /**
@@ -61,7 +42,7 @@ public abstract class PlayerAdapter implements IPlayer {
      */
     @Override
     public boolean alreadyShot(int x, int y) {
-        return player.alreadyShot(x, y);
+        return false;
     }
 
     /**
@@ -72,7 +53,7 @@ public abstract class PlayerAdapter implements IPlayer {
      */
     @Override
     public boolean isEliminated() {
-        return player.isEliminated();
+        return false;
     }
 
     /**
@@ -83,7 +64,7 @@ public abstract class PlayerAdapter implements IPlayer {
      */
     @Override
     public String getName() {
-        return player.getName();
+        return "Player";
     }
 
     /**
@@ -95,7 +76,7 @@ public abstract class PlayerAdapter implements IPlayer {
      */
     @Override
     public List<int[]> getShots() {
-        return player.getShots();
+        return null;
     }
 
     /**
@@ -105,6 +86,6 @@ public abstract class PlayerAdapter implements IPlayer {
      * @return the wrapped IPlayer instance
      */
     protected IPlayer getPlayer() {
-        return player;
+        return null;
     }
 }
