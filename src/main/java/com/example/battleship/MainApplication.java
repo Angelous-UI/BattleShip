@@ -14,12 +14,12 @@ public class MainApplication extends Application {
 
     @Override
     public void start(Stage primaryStage) throws Exception {
-        // Solo instancia y muestra la vista del menú principal
-        MainMenuView mainMenuView = new MainMenuView();
-        mainMenuView.show();
+        MainMenuView.getInstance();
+
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args)
+    {
         launch();
     }
 }
