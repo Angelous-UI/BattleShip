@@ -3,8 +3,10 @@ package com.example.battleship.Controllers;
 import com.example.battleship.Model.Board.Board;
 import com.example.battleship.Model.Game.Game;
 import com.example.battleship.Model.Game.GameState;
+import com.example.battleship.Model.Player.PlayerData;
 import com.example.battleship.Model.Serializable.SerializableFileHandler;
 import com.example.battleship.Model.Ship.*;
+import com.example.battleship.Model.TextFile.PlaneTextFileHandler;
 import com.example.battleship.Model.Utils.SpriteSheet;
 import com.example.battleship.Views.GameView;
 import com.example.battleship.Views.MainMenuView;
@@ -35,7 +37,8 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
 import javafx.scene.control.Alert;
-// import com.example.battleship.Model.Game.GameStateHolder;
+import com.example.battleship.Views.VictoryView;
+import javafx.scene.media.MediaException;
 
 import java.net.URL;
 import java.util.*;
@@ -45,14 +48,14 @@ import java.util.concurrent.Executors;
 
 /**
  * Controller class for the main game view in the Battleship application.
+ * <p>
  * Handles all game logic, user interactions, ship placement, shooting mechanics,
- * UI updates, animations, and media playback.
+ * UI updates, animations, and media playback. Manages two game boards (player and enemy),
+ * ship placement during setup phase, turn-based gameplay between human and AI,
+ * visual feedback through animations and sprite rendering, and game state persistence.
+ * </p>
  *
- * <p>This controller manages two game boards (player and enemy), ship placement
- * during setup phase, turn-based gameplay between human and AI, visual feedback
- * through animations and sprite rendering, and game state persistence.</p>
- *
- * <p>Key responsibilities:</p>
+ * <p><b>Key responsibilities:</b></p>
  * <ul>
  *   <li>Initialize game boards and fleet generation</li>
  *   <li>Handle ship placement with drag preview and rotation</li>
@@ -71,220 +74,110 @@ import java.util.concurrent.Executors;
  */
 public class GameController implements Initializable {
 
-    /**
-     * Container for the background video display.
-     */
     @FXML
     private AnchorPane videoContainer;
 
-    /**
-     * Button to return to the main menu.
-     */
     @FXML
     private Button GoBackButton;
 
-    /**
-     * Canvas for rendering the player's board.
-     */
     @FXML
     private Canvas playerCanvas;
 
-    /**
-     * Canvas for rendering the enemy's board.
-     */
     @FXML
     private Canvas enemyCanvas;
 
-    /**
-     * Button to toggle visibility of enemy ships (for debugging/verification).
-     */
     @FXML
     private Button toggleShipsButton;
 
-    /**
-     * Label displaying current game status messages.
-     */
     @FXML
     private Label statusLabel;
 
-    /**
-     * Label displaying whose turn it is.
-     */
     @FXML
     private Label turnLabel;
 
-    /**
-     * Flag controlling whether enemy ships are visible on the board.
-     */
-    private boolean showEnemyShips = true;
+    @FXML
+    private Button helpButton;
 
-    /**
-     * Graphics context for drawing on the player canvas.
-     */
+    private boolean showEnemyShips = false;
+    private boolean videoWarmedUp = false;
+
     private GraphicsContext gPlayer;
-
-    /**
-     * Graphics context for drawing on the enemy canvas.
-     */
     private GraphicsContext gEnemy;
-
-    /**
-     * Media player for background video.
-     */
     private MediaPlayer mediaPlayer;
-
-    /**
-     * Reference to the primary stage window.
-     */
     private Stage stage;
 
-    /**
-     * Width of each cell in pixels.
-     */
-    private final int WIDTH_CELL = 364/10;
-
-    /**
-     * Height of each cell in pixels.
-     */
-    private final int HEIGHT_CELL = 301/10;
-
-    /**
-     * Board size (10x10 grid).
-     */
+    private final int WIDTH_CELL = 364 / 10;
+    private final int HEIGHT_CELL = 301 / 10;
     private final int SIZE = 10;
-    /**
-     * Size of the current ship being placed.
-     */
     private int currentShipSize = 4;
-
-    /**
-     * Flag indicating if the current ship is placed vertically.
-     */
     private boolean vertical = false;
 
-    /**
-     * Reference to the player's board (legacy, may be unused).
-     */
     private Board board;
-
-    /**
-     * Reference to the enemy's board.
-     */
     private Board boardEnemy;
-
-    /**
-     * List of enemy ships.
-     */
     List<IShip> enemyShips;
-
-    /**
-     * Coordinate storage (legacy, may be unused).
-     */
     List<int[]> coords;
-
-    /**
-     * Stack of ships placed by the player.
-     */
     private Stack<IShip> ships = new Stack<>();
 
-    /**
-     * Image for missed shots (water).
-     */
     private Image missImage;
-
-    /**
-     * Image for hit markers on sunken ships.
-     */
     private Image hitImage;
-
-    /**
-     * Image for explosion effects on hits.
-     */
     private Image explosionImage;
 
-    // ================= FLEET ORDER =================
-    /**
-     * Array defining the fleet composition by ship sizes.
-     * Order: 1 carrier (4), 2 submarines (3), 3 destroyers (2), 4 frigates (1).
-     */
-    private final int[] fleet = {4,3,3,2,2,2,1,1,1,1};
-
-    /**
-     * Current index in the fleet array during ship placement.
-     */
+    private final int[] fleet = {4, 3, 3, 2, 2, 2, 1, 1, 1, 1};
     private int shipIndex = 0;
-    // ================= GAME ========================
-    /**
-     * Main game model instance managing all game state and logic.
-     */
-    private Game game;
 
-    /**
-     * Renderer for drawing board elements.
-     */
+    private Game game;
     private final BoardRenderer boardRenderer = new BoardRenderer();
 
-    // ================= THREADS =====================
-    /**
-     * Executor service for game logic tasks.
-     */
     private ExecutorService gameExecutor;
-
-    /**
-     * Executor service for AI computation tasks.
-     */
     private ExecutorService aiExecutor;
-
-    /**
-     * Flag indicating if the game is currently running.
-     */
     private volatile boolean isRunning = false;
 
-    /**
-     * Handler for serializing and deserializing game state.
-     */
     private SerializableFileHandler serializableHandler = new SerializableFileHandler();
+    private PlaneTextFileHandler plainTextFileHandler;
+    private PlayerData currentPlayerData;
 
-
-    // ================= SPRITES =====================
-    /**
-     * Sprite sheet for aircraft carrier graphics.
-     */
     private final SpriteSheet carrierSheet = new SpriteSheet(
             getClass().getResource("/Battleship-Images/portaaviones.png").toExternalForm(),
             WIDTH_CELL, HEIGHT_CELL
     );
 
-    /**
-     * Sprite sheet for frigate graphics.
-     */
     private final SpriteSheet frigateSheet = new SpriteSheet(
             getClass().getResource("/Battleship-Images/fragata.png").toExternalForm(),
             WIDTH_CELL, HEIGHT_CELL
     );
 
-    /**
-     * Sprite sheet for submarine graphics.
-     */
     private final SpriteSheet submarineSheet = new SpriteSheet(
             getClass().getResource("/Battleship-Images/submarinos.png").toExternalForm(),
             WIDTH_CELL, HEIGHT_CELL
     );
 
-    /**
-     * Sprite sheet for destroyer graphics.
-     */
     private final SpriteSheet destroyerSheet = new SpriteSheet(
             getClass().getResource("/Battleship-Images/destructores.png").toExternalForm(),
             WIDTH_CELL, HEIGHT_CELL
     );
 
+    /**
+     * Sets the stage for this controller.
+     *
+     * @param stage the stage to be associated with this controller
+     */
     public void setStage(Stage stage) {
         this.stage = stage;
     }
 
+    /**
+     * Initializes the game controller.
+     * <p>
+     * Sets up canvases, graphics contexts, executor services, loads images,
+     * configures event handlers for ship placement, and draws initial grids.
+     * </p>
+     *
+     * @param url the location used to resolve relative paths for the root object
+     * @param resourceBundle the resources used to localize the root object
+     */
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
+        plainTextFileHandler = new PlaneTextFileHandler();
 
         if (gameExecutor != null && !gameExecutor.isShutdown()) {
             gameExecutor.shutdownNow();
@@ -299,14 +192,11 @@ public class GameController implements Initializable {
         gameExecutor = Executors.newSingleThreadExecutor();
         aiExecutor = Executors.newSingleThreadExecutor();
 
-        setupBackgroundVideo();
         addExplosionEffect(GoBackButton);
 
         missImage = new Image(getClass().getResource("/Battleship-Images/12.png").toExternalForm());
         hitImage = new Image(getClass().getResource("/Battleship-Images/11.png").toExternalForm());
         explosionImage = new Image(getClass().getResource("/Battleship-Images/13.png").toExternalForm());
-
-
 
         playerCanvas.setOnMouseMoved(this::previewShip);
         playerCanvas.setOnMouseClicked(this::placeShip);
@@ -324,27 +214,126 @@ public class GameController implements Initializable {
 
         drawGrid(gPlayer);
         drawGrid(gEnemy);
-        // drawEnemyFleet();
-
-
     }
 
-    public void initializeNewGame() {
-        game = new Game();
-        game.generateFleet(); // Genera la flota de la máquina
+    /**
+     * Called when the scene is ready for video initialization.
+     * <p>
+     * Delays video setup briefly to ensure smooth loading without blocking UI initialization.
+     * </p>
+     */
+    public void onSceneReady() {
+        Platform.runLater(() -> {
+            PauseTransition delay = new PauseTransition(Duration.millis(500));
+            delay.setOnFinished(e -> setupBackgroundVideo());
+            delay.play();
+        });
+    }
+
+    /**
+     * Initializes a new game session for the specified player.
+     * <p>
+     * Creates a new game instance, generates enemy fleet, loads player data,
+     * and prepares the board for ship placement phase.
+     * </p>
+     *
+     * @param playerName the name of the player starting the game
+     */
+    public void initializeNewGame(String playerName) {
+        game = new Game(playerName);
+        System.out.println(game.getHuman().getName());
+        game.generateFleet();
 
         boardEnemy = game.getMachineBoard();
 
-        drawEnemyFleet();
+        showEnemyShips = false;
+        redrawEnemyBoard();
+
+        currentPlayerData = loadPlayerData(playerName);
+        if (currentPlayerData == null) {
+            currentPlayerData = new PlayerData(playerName);
+        }
 
         updateStatusLabel("📍 Coloca: Barco de 4 celdas");
-        turnLabel.setText("COLOCANDO: 1/" + fleet.length);
+        turnLabel.setText("Colocando: 1/" + fleet.length);
     }
 
-    public void loadSavedGame(GameState savedState) {
-        game = new Game();
+    /**
+     * Loads player data from persistent storage.
+     * <p>
+     * Reads the player data file and searches for the specified player's statistics.
+     * </p>
+     *
+     * @param playerName the name of the player whose data should be loaded
+     * @return PlayerData object if found, null otherwise
+     */
+    private PlayerData loadPlayerData(String playerName) {
+        try {
+            String[] data = plainTextFileHandler.readFromFile("player_data.txt");
 
-        // Restaurar el estado del juego
+            for (int i = 0; i < data.length; i++) {
+                String[] fields = data[i].split(",");
+                if (fields.length >= 5 && fields[0].equals(playerName)) {
+                    return PlayerData.fromCSV(fields);
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("⚠️ Could not load player data");
+        }
+        return null;
+    }
+
+    /**
+     * Saves current player data to persistent storage.
+     * <p>
+     * Updates existing player record or creates new entry in the player data file.
+     * </p>
+     */
+    private void savePlayerData() {
+        try {
+            String[] allData = plainTextFileHandler.readFromFile("player_data.txt");
+            StringBuilder content = new StringBuilder();
+
+            boolean playerFound = false;
+
+            for (String line : allData) {
+                if (!line.trim().isEmpty()) {
+                    String[] fields = line.split(",");
+                    if (fields.length >= 5 && fields[0].equals(currentPlayerData.getName())) {
+                        content.append(currentPlayerData.toCSV()).append("\n");
+                        playerFound = true;
+                    } else {
+                        content.append(line).append("\n");
+                    }
+                }
+            }
+
+            if (!playerFound) {
+                content.append(currentPlayerData.toCSV()).append("\n");
+            }
+
+            plainTextFileHandler.writeToFile("player_data.txt", content.toString());
+            System.out.println("💾 Player data saved (plain text file)");
+
+        } catch (Exception e) {
+            System.err.println("❌ Error saving player data: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Loads a previously saved game state.
+     * <p>
+     * Restores all game state including boards, fleets, shots, current player,
+     * and game phase. Redraws boards and either continues ship placement or
+     * resumes active gameplay.
+     * </p>
+     *
+     * @param savedState the saved game state to restore
+     * @param username the name of the player
+     */
+    public void loadSavedGame(GameState savedState, String username) {
+        game = new Game(username);
+
         game.setHumanBoard(savedState.getHumanBoard());
         game.setMachineBoard(savedState.getMachineBoard());
         game.setHumanFleet(savedState.getHumanFleet());
@@ -352,23 +341,24 @@ public class GameController implements Initializable {
         game.setHumanShots(savedState.getHumanShots());
         game.setMachineShots(savedState.getMachineShots());
         game.setCurrentPlayerIndex(savedState.getCurrentPlayerIndex());
-        game.setCurrentState(savedState.getGamePhase());  // ✅ Usar getGamePhase()
+        game.setCurrentState(savedState.getGamePhase());
         game.setGameOver(savedState.isGameOver());
 
-        // Restaurar referencias locales
+        currentPlayerData = loadPlayerData(savedState.getPlayerName());
+        if (currentPlayerData == null) {
+            currentPlayerData = new PlayerData(savedState.getPlayerName());
+        }
+
         boardEnemy = game.getMachineBoard();
         ships = new Stack<>();
         ships.addAll(savedState.getHumanFleet());
 
-        // Redibujar tableros
         drawPlacedShips();
         redrawEnemyBoard();
 
-        // Iniciar el juego si ya estaba en progreso
         if (!savedState.getHumanFleet().isEmpty() && savedState.getHumanFleet().size() == fleet.length) {
             startGame();
         } else {
-            // Continuar colocando barcos
             shipIndex = savedState.getHumanFleet().size();
             if (shipIndex < fleet.length) {
                 currentShipSize = fleet[shipIndex];
@@ -378,6 +368,13 @@ public class GameController implements Initializable {
         }
     }
 
+    /**
+     * Saves the current game state to persistent storage.
+     * <p>
+     * Creates a GameState snapshot with all current game data and serializes it
+     * to a file named after the player. Does not save if the game has already ended.
+     * </p>
+     */
     private void saveGame() {
         try {
             GameState savedState = new GameState(
@@ -393,69 +390,97 @@ public class GameController implements Initializable {
                     game.isGameOver()
             );
 
-            serializableHandler.serialize("game_save.dat", savedState);
+            if (game.hasHumanWon()) {
+                return;
+            }
 
-            Alert alert = createStyledAlert(Alert.AlertType.INFORMATION,
-                    "Partida Guardada",
-                    "✅ Éxito",
-                    "La partida se ha guardado correctamente.",
-                    "my-info-alert");
-            alert.showAndWait();
+            String playerName = game.getHuman().getName().toLowerCase().trim();
+            String filename = "game_save_" + playerName + ".dat";
+            serializableHandler.serialize(filename, savedState);
+            System.out.println("💾 Game saved: " + filename);
 
         } catch (Exception e) {
-            System.err.println("❌ Error guardando partida: " + e.getMessage());
+            System.err.println("❌ Error saving game: " + e.getMessage());
             e.printStackTrace();
-        } // puto samuel
+        }
     }
 
-    private void rotate(KeyEvent ke){
+    /**
+     * Handles ship rotation during placement phase.
+     * <p>
+     * Toggles between horizontal and vertical orientation when R or SPACE is pressed.
+     * </p>
+     *
+     * @param ke the key event
+     */
+    private void rotate(KeyEvent ke) {
         if (ke.getCode() == KeyCode.R || ke.getCode() == KeyCode.SPACE) {
             vertical = !vertical;
             drawPlacedShips();
         }
     }
 
-    
-    // =========== PLAYER GRID ====================
-
+    /**
+     * Draws the grid overlay on a canvas.
+     * <p>
+     * Creates a 10x10 grid with semi-transparent white lines.
+     * </p>
+     *
+     * @param g the graphics context to draw on
+     */
     private void drawGrid(GraphicsContext g) {
         g.setFill(Color.web("TRANSPARENT"));
-        g.fillRect(0,0,364,301);
+        g.fillRect(0, 0, 364, 301);
 
-        g.setStroke(Color.rgb(255,255,255,0.3));
+        g.setStroke(Color.rgb(255, 255, 255, 0.3));
         g.setLineWidth(1);
 
-        // Vertical Lines
         for (int i = 0; i <= SIZE; i++) {
-            g.strokeLine(i*WIDTH_CELL, 0, i*WIDTH_CELL, 301);
+            g.strokeLine(i * WIDTH_CELL, 0, i * WIDTH_CELL, 301);
         }
 
-        // Horizontal Lines
         for (int i = 0; i <= SIZE; i++) {
-            g.strokeLine(0, i*HEIGHT_CELL, 364, i*HEIGHT_CELL);
+            g.strokeLine(0, i * HEIGHT_CELL, 364, i * HEIGHT_CELL);
         }
     }
 
+    /**
+     * Shows a preview of the ship being placed as the mouse moves.
+     * <p>
+     * Displays a semi-transparent overlay of the ship if it fits at the current position.
+     * </p>
+     *
+     * @param e the mouse event
+     */
     private void previewShip(MouseEvent e) {
         drawPlacedShips();
 
-        if(currentShipSize == 0) return;
+        if (currentShipSize == 0) return;
 
-        int col = (int)(e.getX() / WIDTH_CELL);
-        int row = (int)(e.getY() / HEIGHT_CELL);
+        int col = (int) (e.getX() / WIDTH_CELL);
+        int row = (int) (e.getY() / HEIGHT_CELL);
 
-        if(!fits(row, col, currentShipSize)) return;
+        if (!fits(row, col, currentShipSize)) return;
 
-        gPlayer.setFill(Color.rgb(0,255,255,0.35));
-        for(int i=0;i<currentShipSize;i++){
+        gPlayer.setFill(Color.rgb(0, 255, 255, 0.35));
+        for (int i = 0; i < currentShipSize; i++) {
             gPlayer.fillRect(
-                    col * WIDTH_CELL + (vertical?0:i*WIDTH_CELL),
-                    row * HEIGHT_CELL + (vertical?i*HEIGHT_CELL:0),
+                    col * WIDTH_CELL + (vertical ? 0 : i * WIDTH_CELL),
+                    row * HEIGHT_CELL + (vertical ? i * HEIGHT_CELL : 0),
                     WIDTH_CELL, HEIGHT_CELL
             );
         }
     }
 
+    /**
+     * Handles ship placement on player board.
+     * <p>
+     * Validates position, creates the appropriate ship type, adds it to the game,
+     * and advances to the next ship in the fleet.
+     * </p>
+     *
+     * @param e the mouse event
+     */
     private void placeShip(MouseEvent e) {
         if (currentShipSize == 0) return;
 
@@ -464,9 +489,6 @@ public class GameController implements Initializable {
 
         if (!fits(row, col, currentShipSize)) return;
 
-/*        for (int i = 0; i < currentShipSize; i++) {
-            board.setCell(row + (vertical ? i : 0), col + (vertical ? 0 : i), 1);
-        }*/
         IShip.Direction dir = vertical ? IShip.Direction.DOWN : IShip.Direction.RIGHT;
         IShip newShip = createShip(currentShipSize, col, row, dir);
         ships.add(newShip);
@@ -476,12 +498,20 @@ public class GameController implements Initializable {
             game.placeHumanShip(newShip);
             drawPlacedShips();
             advanceToNextShip();
-        } catch(Exception ex) {
+        } catch (Exception ex) {
             System.out.println(ex.getMessage());
         }
-
     }
 
+    /**
+     * Factory method to create a ship based on size.
+     *
+     * @param size the size of the ship (1-4)
+     * @param col the starting column
+     * @param row the starting row
+     * @param dir the direction of the ship
+     * @return the created ship instance, or null if size is invalid
+     */
     private IShip createShip(int size, int col, int row, IShip.Direction dir) {
         return switch (size) {
             case 4 -> new AircraftCarrier(col, row, dir);
@@ -492,24 +522,42 @@ public class GameController implements Initializable {
         };
     }
 
-    private boolean fits(int row,int col,int size){
+    /**
+     * Checks if a ship of given size fits at the specified position.
+     * <p>
+     * Validates that the ship stays within bounds and doesn't overlap existing ships.
+     * </p>
+     *
+     * @param row the starting row
+     * @param col the starting column
+     * @param size the size of the ship
+     * @return true if the ship fits, false otherwise
+     */
+    private boolean fits(int row, int col, int size) {
         Board humanBoard = game.getHumanBoard();
 
-        for(int i=0;i<size;i++){
-            int r = row + (vertical?i:0);
-            int c = col + (vertical?0:i);
+        for (int i = 0; i < size; i++) {
+            int r = row + (vertical ? i : 0);
+            int c = col + (vertical ? 0 : i);
 
-            if(r>=SIZE || c>=SIZE) return false;
-            if(humanBoard.getCell(r,c) == 1) return false;
+            if (r >= SIZE || c >= SIZE) return false;
+            if (humanBoard.getCell(r, c) == 1) return false;
         }
         return true;
     }
 
-    private void drawPlacedShips(){
+    /**
+     * Redraws all placed ships and shot markers on the player board.
+     * <p>
+     * Clears the canvas, draws the grid, renders all ships using appropriate sprites,
+     * displays shot markers (misses and hits), and marks sunken ships.
+     * </p>
+     */
+    private void drawPlacedShips() {
         gPlayer.clearRect(0, 0, playerCanvas.getWidth(), playerCanvas.getHeight());
         drawGrid(gPlayer);
 
-        for(IShip ship : ships) {
+        for (IShip ship : ships) {
             int col = ship.getCol();
             int row = ship.getRow();
             int size = ship.getShipSize();
@@ -522,48 +570,40 @@ public class GameController implements Initializable {
                 case 3 -> submarineSheet.getSlices(size, direction);
                 case 4 -> carrierSheet.getSlices(size, direction);
                 default -> null;
-                // Get the correct sprite sheet for this ship size
             };
 
-            System.out.println("🎨 Dibujando barco: size=" + size +
+            System.out.println("🎨 Drawing ship: size=" + size +
                     " dir=" + (direction ? "VERTICAL" : "HORIZONTAL") +
                     " pos=(" + row + "," + col + ")" +
                     " images=" + (images != null ? images.length : "null"));
 
-            // Draw each segment of the ship
             if (images != null) {
                 for (int j = 0; j < size; j++) {
                     int drawCol = col + (direction ? 0 : j);
                     int drawRow = row + (direction ? j : 0);
 
-                    System.out.println("  └─ Segmento " + j + " en (" + drawRow + "," + drawCol +
+                    System.out.println("  └─ Segment " + j + " at (" + drawRow + "," + drawCol +
                             ") img=" + (images[j] != null ? "✓" : "✗") +
                             " imgSize=" + (images[j] != null ?
                             images[j].getWidth() + "x" + images[j].getHeight() : "null"));
 
                     boardRenderer.drawTile(gPlayer, drawCol, drawRow, images[j]);
-                    System.out.println("Cuba motilado asqueroso");
                 }
             }
         }
 
-
-        // ========== DIBUJAR MARCADORES DE DISPAROS ==========
         Board humanBoard = game.getHumanBoard();
 
         for (int row = 0; row < 10; row++) {
             for (int col = 0; col < 10; col++) {
                 int cell = humanBoard.getCell(row, col);
 
-                // Agua fallada (Miss)
                 if (cell == 2) {
                     gPlayer.drawImage(missImage,
                             col * WIDTH_CELL,
                             row * HEIGHT_CELL,
                             WIDTH_CELL, HEIGHT_CELL);
-                }
-                // Impacto en barco (Hit)
-                else if (cell == 3) {
+                } else if (cell == 3) {
                     gPlayer.drawImage(explosionImage,
                             col * WIDTH_CELL,
                             row * HEIGHT_CELL,
@@ -572,7 +612,6 @@ public class GameController implements Initializable {
             }
         }
 
-        // ========== DIBUJAR BARCOS HUNDIDOS ==========
         for (IShip ship : ships) {
             if (ship.isSunken()) {
                 drawPlayerSunkenShip(ship);
@@ -580,6 +619,11 @@ public class GameController implements Initializable {
         }
     }
 
+    /**
+     * Draws markers for a sunken ship on the player board.
+     *
+     * @param ship the sunken ship to mark
+     */
     private void drawPlayerSunkenShip(IShip ship) {
         List<int[]> coords = game.getShipCoordinates(ship);
 
@@ -587,7 +631,6 @@ public class GameController implements Initializable {
             int row = coord[0];
             int col = coord[1];
 
-            // Dibujar el marcador de barco hundido
             gPlayer.drawImage(
                     hitImage,
                     col * WIDTH_CELL,
@@ -598,10 +641,17 @@ public class GameController implements Initializable {
         }
     }
 
-    private void advanceToNextShip(){
+    /**
+     * Advances to the next ship in the placement sequence.
+     * <p>
+     * Increments ship index, updates UI labels, and starts the game
+     * when all ships have been placed.
+     * </p>
+     */
+    private void advanceToNextShip() {
         shipIndex++;
 
-        if(shipIndex >= fleet.length) {
+        if (shipIndex >= fleet.length) {
             currentShipSize = 0;
             playerCanvas.setOnMouseMoved(null);
             playerCanvas.setOnMouseClicked(null);
@@ -613,17 +663,21 @@ public class GameController implements Initializable {
             return;
         }
 
-        // ✅ ACTUALIZAR currentShipSize DESPUÉS del check pero ANTES de usarlo
         currentShipSize = fleet[shipIndex];
 
         updateStatusLabel("📍 Coloca: Barco de " + currentShipSize + " celdas");
-        turnLabel.setText("COLOCANDO: " + (shipIndex + 1) + "/" + fleet.length);
+        turnLabel.setText("Colocando: " + (shipIndex + 1) + "/" + fleet.length);
 
-        System.out.println("Coloca el próximo barco (tamaño " + currentShipSize + ")");
+        System.out.println("Place next ship (size " + currentShipSize + ")");
     }
 
-    // ================ GAME START ========================
-
+    /**
+     * Starts the active gameplay phase.
+     * <p>
+     * Transitions from ship placement to combat, initializes turn order,
+     * enables enemy board interaction, and updates UI.
+     * </p>
+     */
     private void startGame() {
         game.startGame();
         isRunning = true;
@@ -632,20 +686,23 @@ public class GameController implements Initializable {
             updateStatusLabel("¡Juego iniciado! Es tu turno - Click en el tablero enemigo");
             turnLabel.setText("TURNO: Jugador");
 
-            // ⚠️ ESTE ES EL PROBLEMA CRÍTICO
             enemyCanvas.setOnMouseClicked(this::onPlayerShot);
 
-            // 🔍 AGREGAR DEBUGGING:
-            System.out.println("✅ Handler registrado en enemyCanvas");
+            System.out.println("✅ Handler registered on enemyCanvas");
             System.out.println("✅ Game state: " + game.getCurrentState());
             System.out.println("✅ Is human turn? " + game.isHumanTurn());
         });
-
-       // gameExecutor.submit(this::gameLoop);
     }
 
+    /**
+     * Executes the AI's turn.
+     * <p>
+     * Calculates and executes a shot, updates AI strategy based on result,
+     * and handles the outcome through the standard shot result processing.
+     * </p>
+     */
     private void executeMachineTurn() {
-        System.out.println("🤖 === TURNO DE LA MÁQUINA ===");
+        System.out.println("🤖 === MACHINE TURN ===");
 
         Platform.runLater(() -> {
             updateStatusLabel("🤖 La máquina está pensando...");
@@ -665,7 +722,7 @@ public class GameController implements Initializable {
 
             game.getSmartAI().registerResult(row, col, hit, sunk);
 
-            System.out.println("🤖 Máquina dispara: (" + row + "," + col + ") → " + result);
+            System.out.println("🤖 Machine shoots: (" + row + "," + col + ") → " + result);
 
             Platform.runLater(() -> {
                 handleShotResult(result, row, col, false);
@@ -674,24 +731,35 @@ public class GameController implements Initializable {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (Exception e) {
-            System.err.println("❌ ERROR en turno máquina: " + e.getMessage());
+            System.err.println("❌ ERROR in machine turn: " + e.getMessage());
             e.printStackTrace();
         }
 
-        System.out.println("🤖 === FIN TURNO MÁQUINA ===\n");
+        System.out.println("🤖 === END MACHINE TURN ===\n");
     }
-    
-    // =============== ENEMY GRID =========================
 
+    /**
+     * Draws the enemy fleet on the enemy board.
+     * <p>
+     * Retrieves enemy ships and delegates to ship rendering method.
+     * </p>
+     */
     private void drawEnemyFleet() {
         enemyShips = game.getMachineFleet();
         drawEnemyShips(enemyShips);
     }
 
+    /**
+     * Renders enemy ships on the enemy board using appropriate sprites.
+     * <p>
+     * For each ship, selects the correct sprite sheet, extracts slices,
+     * sorts coordinates, and draws each segment in order.
+     * </p>
+     *
+     * @param ships the list of ships to draw
+     */
     private void drawEnemyShips(List<IShip> ships) {
-
         for (IShip ship : ships) {
-
             SpriteSheet sheet = switch (ship.getClass().getSimpleName()) {
                 case "AircraftCarrier" -> carrierSheet;
                 case "Destroyer" -> destroyerSheet;
@@ -708,27 +776,24 @@ public class GameController implements Initializable {
 
             WritableImage[] slices = sheet.getSlices(size, vertical);
 
-            // Coords del barco
             List<int[]> coords = game.getShipCoordinates(ship);
 
-            // 🔥 ORDENAR COORDENADAS 🔥
             coords.sort((a, b) -> {
                 if (vertical) {
-                    return Integer.compare(a[0], b[0]); // fila
+                    return Integer.compare(a[0], b[0]);
                 } else {
-                    return Integer.compare(a[1], b[1]); // columna
+                    return Integer.compare(a[1], b[1]);
                 }
             });
 
-            // Dibujar las piezas en orden
             for (int i = 0; i < size; i++) {
                 int row = coords.get(i)[0];
                 int col = coords.get(i)[1];
 
                 gEnemy.drawImage(
                         slices[i],
-                        col * WIDTH_CELL,  // ✅ Sin ajuste
-                        row * HEIGHT_CELL,  // ✅ Sin ajuste
+                        col * WIDTH_CELL,
+                        row * HEIGHT_CELL,
                         WIDTH_CELL,
                         HEIGHT_CELL
                 );
@@ -736,25 +801,42 @@ public class GameController implements Initializable {
         }
     }
 
-    private void handleBoardClick(Board enemyBoard, int row, int col){
+    /**
+     * Legacy method for handling board clicks.
+     * <p>
+     * May be unused - replaced by direct shot handling methods.
+     * </p>
+     *
+     * @param enemyBoard the board being clicked
+     * @param row the row coordinate
+     * @param col the column coordinate
+     */
+    private void handleBoardClick(Board enemyBoard, int row, int col) {
         game.executeHumanPlay(enemyBoard, game.getHuman(), row, col);
     }
 
+    /**
+     * Handles player shot when clicking on enemy board.
+     * <p>
+     * Validates turn state, calculates shot coordinates, executes shot
+     * asynchronously, and processes the result.
+     * </p>
+     *
+     * @param event the mouse event
+     */
     private void onPlayerShot(MouseEvent event) {
         if (!game.isHumanTurn() || game.getCurrentState() != Game.GameState.PLAYING) {
             updateStatusLabel("¡No es tu turno!");
             return;
         }
 
-        int col = (int)(event.getX() / WIDTH_CELL);
-        int row = (int)(event.getY() / HEIGHT_CELL);
+        int col = (int) (event.getX() / WIDTH_CELL);
+        int row = (int) (event.getY() / HEIGHT_CELL);
 
-        // ✅ Ahora usamos directamente row y col (0-9)
-        System.out.println("🎯 Disparo en: (" + row + "," + col + ")");
+        System.out.println("🎯 Shot at: (" + row + "," + col + ")");
 
         CompletableFuture.runAsync(() -> {
             try {
-                // ✅ Pasamos row, col directamente (0-9)
                 Game.ShotResult result = game.executeHumanShot(row, col);
 
                 Platform.runLater(() -> {
@@ -769,8 +851,20 @@ public class GameController implements Initializable {
         redrawEnemyBoard();
     }
 
+    /**
+     * Processes the result of a shot (from either player or AI).
+     * <p>
+     * Updates boards, displays appropriate messages, manages turn order,
+     * handles game over conditions, and saves game state.
+     * </p>
+     *
+     * @param result the outcome of the shot
+     * @param row the row coordinate of the shot
+     * @param col the column coordinate of the shot
+     * @param isPlayer true if the shot was from the player, false if from AI
+     */
     private void handleShotResult(Game.ShotResult result, int row, int col, boolean isPlayer) {
-        System.out.println("📊 Procesando resultado: " + result + " para " + (isPlayer ? "JUGADOR" : "MÁQUINA"));
+        System.out.println("📊 Processing result: " + result + " for " + (isPlayer ? "PLAYER" : "MACHINE"));
 
         if (isPlayer) {
             redrawEnemyBoard();
@@ -778,7 +872,7 @@ public class GameController implements Initializable {
             drawPlacedShips();
         }
 
-        String target = isPlayer ? "enemigo" : "jugador";
+        String target = isPlayer ? "enemy" : "player";
 
         switch (result) {
             case MISS -> {
@@ -788,12 +882,11 @@ public class GameController implements Initializable {
 
                 game.advanceTurn();
 
-                System.out.println("⏭️ Turno avanzado. Nuevo turno: " +
-                        (game.isHumanTurn() ? "JUGADOR" : "MÁQUINA"));
+                System.out.println("⏭️ Turn advanced. New turn: " +
+                        (game.isHumanTurn() ? "PLAYER" : "MACHINE"));
 
                 if (isPlayer) {
                     turnLabel.setText("TURNO: Máquina");
-                    // ✅ ACTIVAR TURNO DE LA MÁQUINA
                     scheduleAITurn();
                 } else {
                     turnLabel.setText("TURNO: Jugador");
@@ -804,9 +897,8 @@ public class GameController implements Initializable {
                         "💥 ¡Impacto! Dispara de nuevo" :
                         "💥 ¡La máquina te dio! Ella dispara de nuevo");
 
-                System.out.println("🔄 Mismo turno continúa");
+                System.out.println("🔄 Same turn continues");
 
-                // ✅ Si la máquina acertó, debe seguir disparando
                 if (!isPlayer) {
                     scheduleAITurn();
                 }
@@ -816,9 +908,8 @@ public class GameController implements Initializable {
                         "🔥 ¡Hundiste un barco! Dispara de nuevo" :
                         "🔥 ¡La máquina hundió tu barco! Ella sigue");
 
-                System.out.println("🔄 Mismo turno continúa (barco hundido)");
+                System.out.println("🔄 Same turn continues (ship sunk)");
 
-                // ✅ Si la máquina hundió un barco, debe seguir disparando
                 if (!isPlayer) {
                     scheduleAITurn();
                 }
@@ -829,12 +920,10 @@ public class GameController implements Initializable {
                         "Ya disparaste ahí, intenta de nuevo" :
                         "La máquina disparó a una celda repetida");
 
-                // ✅ CRÍTICO: Si es la máquina, debe disparar de nuevo
                 if (!isPlayer) {
-                    System.out.println("   🤖 IA disparó a celda repetida, reintentando...");
+                    System.out.println("   🤖 AI shot repeated cell, retrying...");
                     scheduleAITurn();
                 }
-                // Si es el jugador, simplemente puede hacer click de nuevo
             }
 
             case INVALID -> {
@@ -843,95 +932,201 @@ public class GameController implements Initializable {
                         "Disparo inválido" :
                         "La máquina hizo un disparo inválido");
 
-                // ✅ CRÍTICO: Si es la máquina, debe disparar de nuevo
                 if (!isPlayer) {
-                    System.out.println("   🤖 IA hizo disparo inválido, reintentando...");
+                    System.out.println("   🤖 AI made invalid shot, retrying...");
                     scheduleAITurn();
                 }
             }
         }
 
         if (game.isGameOver()) {
-            System.out.println("🏁 JUEGO TERMINADO");
+            System.out.println("🏁 GAME OVER");
+            serializableHandler.delete("game_save.dat");
             endGame();
+            return;
         }
+
+        saveGame();
     }
 
+    /**
+     * Schedules the AI's turn with appropriate delay and error handling.
+     * <p>
+     * Disables player interaction, waits briefly, executes machine turn,
+     * and re-enables interaction when it's the player's turn again.
+     * </p>
+     */
     private void scheduleAITurn() {
-        System.out.println("🤖 Programando turno de la máquina...");
-        System.out.println("   Estado del juego: " + game.getCurrentState());
+        System.out.println("🤖 Scheduling machine turn...");
+        System.out.println("   Game state: " + game.getCurrentState());
 
-        // Deshabilitar clicks del jugador temporalmente
         enemyCanvas.setOnMouseClicked(null);
 
         CompletableFuture.runAsync(() -> {
             try {
-                Thread.sleep(1000); // Pausa dramática
+                Thread.sleep(1000);
 
-                // ✅ SOLO VERIFICAR QUE EL JUEGO ESTÉ ACTIVO (NO VERIFICAR TURNO)
                 if (game.getCurrentState() != Game.GameState.PLAYING) {
-                    System.out.println("❌ El juego no está activo");
+                    System.out.println("❌ Game is not active");
                     Platform.runLater(() -> {
                         enemyCanvas.setOnMouseClicked(this::onPlayerShot);
                     });
                     return;
                 }
 
-                System.out.println("✅ Ejecutando turno de la máquina...");
+                System.out.println("✅ Executing machine turn...");
                 executeMachineTurn();
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                System.out.println("❌ Thread interrumpido");
+                System.out.println("❌ Thread interrupted");
             } catch (Exception e) {
-                System.err.println("❌ ERROR en scheduleAITurn: " + e.getMessage());
+                System.err.println("❌ ERROR in scheduleAITurn: " + e.getMessage());
                 e.printStackTrace();
             } finally {
-                // ✅ REACTIVAR CLICKS SI ES TURNO DEL JUGADOR
                 Platform.runLater(() -> {
-                    System.out.println("🔄 Finally block - revisando turno...");
-                    System.out.println("   ¿Es turno humano? " + game.isHumanTurn());
+                    System.out.println("🔄 Finally block - checking turn...");
+                    System.out.println("   Is human turn? " + game.isHumanTurn());
 
                     if (game.isHumanTurn() && game.getCurrentState() == Game.GameState.PLAYING) {
-                        System.out.println("✅ Reactivando clicks del jugador");
+                        System.out.println("✅ Re-enabling player clicks");
                         enemyCanvas.setOnMouseClicked(this::onPlayerShot);
                     } else if (game.isMachineTurn() && game.getCurrentState() == Game.GameState.PLAYING) {
-                        System.out.println("🤖 Aún es turno de la máquina, continuando...");
-                        // NO reactivar clicks, la IA seguirá disparando
+                        System.out.println("🤖 Still machine's turn, continuing...");
                     }
                 });
             }
         }, aiExecutor);
     }
 
+    /**
+     * Ends the game and displays results.
+     * <p>
+     * Stops executors, counts statistics, updates player data, deletes save file,
+     * closes current window, and opens victory/defeat screen.
+     * </p>
+     */
     private void endGame() {
         isRunning = false;
 
+        if (gameExecutor != null) {
+            gameExecutor.shutdownNow();
+            try {
+                if (!gameExecutor.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                    System.err.println("⚠️ gameExecutor did not terminate in time");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        if (aiExecutor != null) {
+            aiExecutor.shutdownNow();
+            try {
+                if (!aiExecutor.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                    System.err.println("⚠️ aiExecutor did not terminate in time");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        int playerShipsSunk = (int) game.getMachineFleet().stream()
+                .filter(IShip::isSunken)
+                .count();
+
+        int machineShipsSunk = (int) ships.stream()
+                .filter(IShip::isSunken)
+                .count();
+
+        int playerMisses = 0;
+        int machineMisses = 0;
+
+        Board machineBoard = game.getMachineBoard();
+        Board humanBoard = game.getHumanBoard();
+
+        for (int row = 0; row < 10; row++) {
+            for (int col = 0; col < 10; col++) {
+                if (machineBoard.getCell(row, col) == 2) playerMisses++;
+                if (humanBoard.getCell(row, col) == 2) machineMisses++;
+            }
+        }
+
+        boolean playerWon = game.hasHumanWon();
+
+        currentPlayerData.incrementGamesPlayed();
+        currentPlayerData.addShots(game.getHumanShots().size());
+
+        int hits = 0;
+        for (String shot : game.getHumanShots()) {
+            String[] coords = shot.split(",");
+            int row = Integer.parseInt(coords[0]);
+            int col = Integer.parseInt(coords[1]);
+            if (machineBoard.getCell(row, col) == 3) {
+                hits++;
+            }
+        }
+        currentPlayerData.addHits(hits);
+
+        if (playerWon) {
+            currentPlayerData.incrementGamesWon();
+        }
+
+        savePlayerData();
+
+        final int finalPlayerShipsSunk = playerShipsSunk;
+        final int finalMachineShipsSunk = machineShipsSunk;
+        final int finalPlayerMisses = playerMisses;
+        final int finalMachineMisses = machineMisses;
+        final int finalHits = hits;
+        final int finalTotalShots = game.getHumanShots().size();
+        final String finalPlayerName = currentPlayerData.getName();
+
         Platform.runLater(() -> {
-            String message = game.hasHumanWon() ?
-                    "¡VICTORIA! Hundiste toda la flota enemiga" :
-                    "DERROTA. La máquina hundió toda tu flota";
+            try {
+                System.out.println("🏁 Game over - Winner: " + (playerWon ? "PLAYER" : "MACHINE"));
 
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setTitle("Fin del juego");
-            alert.setHeaderText(message);
-            alert.setContentText("¿Quieres volver al menú principal?");
-            alert.showAndWait();
+                String playerName = finalPlayerName.toLowerCase().trim();
+                String filename = "game_save_" + playerName + ".dat";
+                serializableHandler.delete(filename);
+                System.out.println("🗑️ Save file deleted on game end: " + filename);
 
-            onBackMenu();
+                stopVideo();
+                Stage currentStage = (Stage) videoContainer.getScene().getWindow();
+                currentStage.close();
+
+                VictoryView victoryView = VictoryView.getInstance();
+                victoryView.getController().setGameStats(
+                        finalPlayerName,
+                        playerWon,
+                        finalPlayerShipsSunk,
+                        finalMachineShipsSunk,
+                        finalTotalShots,
+                        finalHits,
+                        finalPlayerMisses,
+                        finalMachineMisses
+                );
+
+            } catch (Exception e) {
+                System.err.println("❌ Error ending game: " + e.getMessage());
+                e.printStackTrace();
+            }
         });
     }
 
+    /**
+     * Redraws the enemy board with current state.
+     * <p>
+     * Clears canvas, draws grid, conditionally shows enemy ships (if debug mode enabled),
+     * draws all shot markers, and marks sunken ships.
+     * </p>
+     */
     private void redrawEnemyBoard() {
-        // Limpia el canvas
         gEnemy.clearRect(0, 0, enemyCanvas.getWidth(), enemyCanvas.getHeight());
 
-        // Redibuja la cuadrícula
         drawGrid(gEnemy);
 
-        // ⭐ SOLO dibuja los barcos si showEnemyShips es true
         if (showEnemyShips) {
-            // Dibuja solo los barcos que NO están hundidos
             List<IShip> enemyFleet = game.getMachineFleet();
             List<IShip> activeShips = enemyFleet.stream()
                     .filter(ship -> !ship.isSunken())
@@ -940,34 +1135,35 @@ public class GameController implements Initializable {
             drawEnemyShips(activeShips);
         }
 
-        // Dibuja todos los marcadores de disparos (SIEMPRE)
         drawAllShotMarkers();
     }
 
+    /**
+     * Draws all shot markers on the enemy board.
+     * <p>
+     * Iterates through all cells, displays misses (water) and hits (explosions),
+     * and marks sunken ships with special indicators.
+     * </p>
+     */
     private void drawAllShotMarkers() {
-        // ✅ Ahora iteramos de 0 a 9
         for (int row = 0; row < 10; row++) {
             for (int col = 0; col < 10; col++) {
                 int cell = boardEnemy.getCell(row, col);
 
-                // Agua fallada
                 if (cell == 2) {
                     gEnemy.drawImage(missImage,
-                            col * WIDTH_CELL,  // ✅ Sin ajuste
-                            row * HEIGHT_CELL,  // ✅ Sin ajuste
+                            col * WIDTH_CELL,
+                            row * HEIGHT_CELL,
                             WIDTH_CELL, HEIGHT_CELL);
-                }
-                // Impacto en barco
-                else if (cell == 3) {
+                } else if (cell == 3) {
                     gEnemy.drawImage(explosionImage,
-                            col * WIDTH_CELL,  // ✅ Sin ajuste
-                            row * HEIGHT_CELL,  // ✅ Sin ajuste
+                            col * WIDTH_CELL,
+                            row * HEIGHT_CELL,
                             WIDTH_CELL, HEIGHT_CELL);
                 }
             }
         }
 
-        // Dibuja escombros de barcos hundidos
         List<IShip> enemyFleet = game.getMachineFleet();
         for (IShip ship : enemyFleet) {
             if (ship.isSunken()) {
@@ -976,6 +1172,11 @@ public class GameController implements Initializable {
         }
     }
 
+    /**
+     * Draws special markers for a sunken enemy ship.
+     *
+     * @param ship the sunken ship to mark
+     */
     private void drawSunkenShip(IShip ship) {
         List<int[]> coords = game.getShipCoordinates(ship);
 
@@ -985,41 +1186,56 @@ public class GameController implements Initializable {
 
             gEnemy.drawImage(
                     hitImage,
-                    col * WIDTH_CELL,  // ✅ Sin ajuste
-                    row * HEIGHT_CELL,  // ✅ Sin ajuste
+                    col * WIDTH_CELL,
+                    row * HEIGHT_CELL,
                     WIDTH_CELL,
                     HEIGHT_CELL
             );
         }
     }
 
+    /**
+     * Updates the status label with a new message.
+     *
+     * @param text the message to display
+     */
     private void updateStatusLabel(String text) {
         if (statusLabel != null) {
             statusLabel.setText(text);
         }
     }
 
-    // ============= MEDIA MANAGEMENT ===================
-
+    /**
+     * Sets up and plays the background video.
+     * <p>
+     * Loads the game video, configures looping, performs preloading optimization
+     * to prevent initial stuttering, handles errors, and starts playback.
+     * </p>
+     */
     private void setupBackgroundVideo() {
         Platform.runLater(() -> {
             try {
-                System.out.println("1. Starting video");
+                System.out.println("🎬 Starting video setup...");
 
-                videoContainer.getChildren().removeIf(node -> node instanceof MediaView);
+                videoContainer.getChildren().removeIf(n -> n instanceof MediaView);
 
                 if (mediaPlayer != null) {
-                    mediaPlayer.stop();
-                    mediaPlayer.dispose();
+                    try {
+                        mediaPlayer.stop();
+                        mediaPlayer.dispose();
+                    } catch (Exception e) {
+                        System.err.println("⚠️ Error cleaning up mediaPlayer: " + e.getMessage());
+                    }
+                    mediaPlayer = null;
                 }
 
-                String videoPath = getClass().getResource("/Battleship-Videos/Game.mp4").toExternalForm();
-                System.out.println("2. Video path: " + videoPath);
+                Media media = new Media(
+                        getClass().getResource("/Battleship-Videos/Game.mp4").toExternalForm()
+                );
 
-                Media media = new Media(videoPath);
                 mediaPlayer = new MediaPlayer(media);
-
-                System.out.println("3. MediaPlayer created");
+                mediaPlayer.setCycleCount(MediaPlayer.INDEFINITE);
+                mediaPlayer.setVolume(0.3);
 
                 MediaView mediaView = new MediaView(mediaPlayer);
                 mediaView.fitWidthProperty().bind(videoContainer.widthProperty());
@@ -1028,44 +1244,50 @@ public class GameController implements Initializable {
                 mediaView.setMouseTransparent(true);
 
                 videoContainer.getChildren().add(0, mediaView);
-                System.out.println("4. MediaView added. childs in videoContainer: " + videoContainer.getChildren().size());
 
-                mediaPlayer.setOnEndOfMedia(() -> {
-                    mediaPlayer.seek(Duration.ZERO);
-                    mediaPlayer.play();
+                mediaPlayer.setOnReady(() -> {
+                    System.out.println("✅ Video ready - Starting preload");
+
+                    mediaPlayer.pause();
+
+                    mediaPlayer.seek(Duration.seconds(0.5));
+
+                    PauseTransition loadBuffer = new PauseTransition(Duration.millis(300));
+                    loadBuffer.setOnFinished(e1 -> {
+                        System.out.println("🔄 Buffer loaded, returning to start...");
+
+                        mediaPlayer.seek(Duration.ZERO);
+
+                        PauseTransition finalWait = new PauseTransition(Duration.millis(200));
+                        finalWait.setOnFinished(e2 -> {
+                            System.out.println("▶️ Playing video (preloaded)");
+                            mediaPlayer.play();
+                        });
+                        finalWait.play();
+                    });
+                    loadBuffer.play();
                 });
 
                 mediaPlayer.setOnError(() -> {
-                    System.err.println("ERROR in mediaPlayer: " + mediaPlayer.getError());
-                    // Intentar recargar
-                    mediaPlayer.dispose();
-                    setupBackgroundVideo();
+                    System.err.println("❌ Video error: " + mediaPlayer.getError());
+                    mediaPlayer.getError().printStackTrace();
                 });
 
-                mediaPlayer.setOnReady(() -> {
-                    System.out.println("5. Video Ready");
-                    mediaPlayer.play();
-                    System.out.println("6. Running video");
-
-                    if (stage != null && !stage.isShowing()) {
-                        stage.show();
-                    }
+                mediaPlayer.statusProperty().addListener((obs, oldStatus, newStatus) -> {
+                    System.out.println("📊 Video status: " + oldStatus + " → " + newStatus);
                 });
-
-                mediaPlayer.setVolume(0.3);
 
             } catch (Exception e) {
-                System.err.println("EXCEPCIÓN en setupBackgroundVideo: " + e.getMessage());
+                System.err.println("❌ Error loading video: " + e.getMessage());
                 e.printStackTrace();
                 videoContainer.setStyle("-fx-background-color: #001a33;");
-                if (stage != null) {
-                    stage.show();
-                }
             }
         });
     }
 
-
+    /**
+     * Stops and disposes of the background video player.
+     */
     public void stopVideo() {
         if (mediaPlayer != null) {
             mediaPlayer.stop();
@@ -1074,6 +1296,15 @@ public class GameController implements Initializable {
         }
     }
 
+    /**
+     * Adds explosion effect and shake animation to a button.
+     * <p>
+     * Attaches click handler that triggers particle effects, button shake,
+     * and executes the appropriate action after a delay.
+     * </p>
+     *
+     * @param button the button to enhance with effects
+     */
     private void addExplosionEffect(Button button) {
         button.setOnMouseClicked(event -> {
             event.consume();
@@ -1094,9 +1325,19 @@ public class GameController implements Initializable {
         });
     }
 
+    /**
+     * Creates a particle-based explosion animation.
+     * <p>
+     * Generates multiple colored particles that radiate outward from the center,
+     * fading and shrinking as they travel.
+     * </p>
+     *
+     * @param x the x-coordinate of the explosion center
+     * @param y the y-coordinate of the explosion center
+     */
     private void createExplosion(double x, double y) {
         if (videoContainer == null) {
-            System.out.println("menuPane2 == null se cancela la explosuion");
+            System.out.println("videoContainer is null, explosion cancelled");
             return;
         }
         Random random = new Random();
@@ -1135,6 +1376,14 @@ public class GameController implements Initializable {
         }
     }
 
+    /**
+     * Applies a shaking animation to a button.
+     * <p>
+     * Creates a rapid back-and-forth motion to simulate impact.
+     * </p>
+     *
+     * @param button the button to shake
+     */
     private void shakeButton(Button button) {
         Timeline shake = new Timeline(
                 new KeyFrame(Duration.ZERO,
@@ -1161,30 +1410,52 @@ public class GameController implements Initializable {
         shake.play();
     }
 
+    /**
+     * Loads the main menu view.
+     * <p>
+     * Saves current game if active, stops executors and video, closes current stage,
+     * and creates new main menu instance.
+     * </p>
+     */
     private void loadMainMenuView() {
         try {
-
             isRunning = false;
 
-            if (gameExecutor != null) {gameExecutor.shutdownNow();}
-            if (aiExecutor != null) {aiExecutor.shutdownNow();}
+            if (gameExecutor != null) {
+                gameExecutor.shutdownNow();
+            }
+            if (aiExecutor != null) {
+                aiExecutor.shutdownNow();
+            }
+
+            if (game != null && game.getCurrentState() == Game.GameState.PLAYING) {
+                saveGame();
+                System.out.println("💾 Game saved before returning to menu");
+            }
 
             stopVideo();
 
             Stage currentStage = (Stage) GoBackButton.getScene().getWindow();
 
-            GameView.deleteInstance(); // Limpia la instancia actual de Game
-            MainMenuView.deleteInstance(); // Limpia cualquier instancia previa del MainMenu
+            GameView.deleteInstance();
+            MainMenuView.deleteInstance();
 
-            MainMenuView mainMenuView = MainMenuView.getInstance(); // Crea nueva instancia del MainMenu
+            MainMenuView mainMenuView = MainMenuView.getInstance();
 
-            currentStage.close(); // Cierra la ventana del juego
+            currentStage.close();
 
         } catch (Exception e) {
             System.err.println("Error loading MainMenu view: " + e.getMessage());
             e.printStackTrace();
         }
     }
+
+    /**
+     * Handles the back to menu button action.
+     * <p>
+     * Stops game execution and loads the main menu.
+     * </p>
+     */
     @FXML
     private void onBackMenu() {
         isRunning = false;
@@ -1196,17 +1467,23 @@ public class GameController implements Initializable {
             aiExecutor.shutdownNow();
         }
 
-        saveGame();
-
         stopVideo();
-        System.out.println("Go back to main menu...");
+        System.out.println("Going back to main menu...");
         loadMainMenuView();
     }
 
-
-
+    /**
+     * Displays the help dialog with game instructions.
+     * <p>
+     * Shows fleet composition, controls, and gameplay rules in a styled alert.
+     * </p>
+     */
     @FXML
     private void showHelp() {
+        shakeButton(helpButton);
+        createExplosion(helpButton.getLayoutX() + helpButton.getWidth() / 2,
+                helpButton.getLayoutY() + helpButton.getHeight() / 2);
+
         String Title = "Ayuda - Batalla Naval";
         String Header = "📋 Cómo jugar";
         String rules = """
@@ -1227,11 +1504,20 @@ public class GameController implements Initializable {
             ⚔️ Cuando termines de colocar todos los barcos,
             podrás comenzar a atacar al enemigo.
             """;
-        Alert alert = createStyledAlert(Alert.AlertType.INFORMATION,Title,Header,rules,"my-info-alert");
+        Alert alert = createStyledAlert(Alert.AlertType.INFORMATION, Title, Header, rules, "my-info-alert");
         alert.showAndWait();
-
     }
 
+    /**
+     * Creates a styled alert dialog with custom CSS.
+     *
+     * @param type the type of alert
+     * @param title the alert title
+     * @param header the alert header text
+     * @param content the alert content text
+     * @param styleClass the CSS style class to apply
+     * @return the configured Alert instance
+     */
     private Alert createStyledAlert(Alert.AlertType type, String title, String header, String content, String styleClass) {
         Alert alert = new Alert(type);
         alert.initStyle(StageStyle.UNDECORATED);
@@ -1247,36 +1533,58 @@ public class GameController implements Initializable {
         if (css != null) {
             dialogPane.getStylesheets().add(css.toExternalForm());
         } else {
-            System.err.println("⚠️ CSS not found at: " + "/Styles.css");
+            System.err.println("⚠️ CSS not found at: /Styles.css");
         }
         dialogPane.getStyleClass().add(styleClass);
 
         return alert;
     }
 
+    /**
+     * Toggles visibility of enemy ships on the board.
+     * <p>
+     * Debug feature that allows viewing enemy ship positions.
+     * Updates button text accordingly.
+     * </p>
+     */
     @FXML
     private void toggleEnemyShips() {
         showEnemyShips = !showEnemyShips;
+
+        addExplosionEffect(toggleShipsButton);
+
         redrawEnemyBoard();
 
         if (showEnemyShips) {
             toggleShipsButton.setText("Ocultar Barcos");
-            System.out.println("👁️ Mostrando barcos enemigos");
+            System.out.println("👁️ Showing enemy ships");
         } else {
             toggleShipsButton.setText("Mostrar Barcos");
-            System.out.println("🙈 Ocultando barcos enemigos");
+            System.out.println("🙈 Hiding enemy ships");
         }
     }
 
+    /**
+     * Utility class for rendering board tiles.
+     * <p>
+     * Handles drawing images at specific grid coordinates with proper scaling.
+     * </p>
+     */
     public static class BoardRenderer {
 
-        private final int WIDTH_CELL = 364/10;
-        private final int HEIGHT_CELL = 301/10;
+        private final int WIDTH_CELL = 364 / 10;
+        private final int HEIGHT_CELL = 301 / 10;
 
-        public void drawTile(GraphicsContext g, int x, int y, Image img){
+        /**
+         * Draws an image tile at the specified grid coordinates.
+         *
+         * @param g the graphics context to draw on
+         * @param x the column coordinate (0-9)
+         * @param y the row coordinate (0-9)
+         * @param img the image to draw
+         */
+        public void drawTile(GraphicsContext g, int x, int y, Image img) {
             g.drawImage(img, x * WIDTH_CELL, y * HEIGHT_CELL, WIDTH_CELL, HEIGHT_CELL);
         }
-
     }
-
 }

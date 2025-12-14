@@ -11,13 +11,13 @@ class GameTest {
 
     @Test
     void testPlayersInitialized() {
-        Game game = new Game();
+        Game game = new Game("You");
         assertEquals(2, game.getPlayers().size());
     }
 
     @Test
     void testPlaceValidShip() {
-        Game game = new Game();
+        Game game = new Game("You");
         IShip ship = new Frigate(3, 3, IShip.Direction.RIGHT);
 
         assertDoesNotThrow(() -> game.placeShip(ship));
@@ -28,7 +28,7 @@ class GameTest {
 
     @Test
     void testInvalidShipPlacementOutsideBoard() {
-        Game game = new Game();
+        Game game = new Game("You");
 
         // A ship outside limits
         IShip ship = new Frigate(11, 11, IShip.Direction.UP);
@@ -38,7 +38,7 @@ class GameTest {
 
     @Test
     void testCannotPlaceShipOnOccupiedCell() {
-        Game game = new Game();
+        Game game = new Game("You");
         IShip s1 = new Frigate(5, 5, IShip.Direction.UP);
         IShip s2 = new Frigate(5, 5, IShip.Direction.DOWN);
 
@@ -48,7 +48,7 @@ class GameTest {
 
     @Test
     void testGetShipCoordinates() {
-        Game game = new Game();
+        Game game = new Game("You");
         IShip f = new Frigate(2, 2, IShip.Direction.RIGHT);
 
         var coords = game.getShipCoordinates(f);
@@ -59,7 +59,7 @@ class GameTest {
 
     @Test
     void testAdvanceTurnLoopsThroughPlayers() {
-        Game game = new Game();
+        Game game = new Game("You");
 
         Object p1 = game.getPlayers().get(0);
         Object p2 = game.getPlayers().get(1);

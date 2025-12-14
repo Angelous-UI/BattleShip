@@ -91,20 +91,20 @@ public class Game implements IGame {
     /**
      * Creates a new game instance and initializes players and boards.
      */
-    public Game() {
+    public Game(String username) {
         this.players = new ArrayList<>();
         this.turnQueue = new LinkedList<>();
         this.machineBoard = new Board();
         this.humanBoard = new Board();
         this.currentState = GameState.SETUP;
-        initializePlayers();
+        initializePlayers(username);
     }
 
     /**
      * Initializes human and machine players and adds them to the turn queue.
      */
-    private void initializePlayers() {
-        human = new Human("You");
+    private void initializePlayers(String username) {
+        human = new Human(username);
         players.add(human);
         turnQueue.add(human);
 

@@ -24,4 +24,6 @@ public interface ISerializableFileHandler {
      * @return the deserialized object, or {@code null} if the operation fails
      */
     Object deserialize(String fileName);
+
+    boolean delete(String filename);
 }

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.shape.Rectangle?>
+
+<AnchorPane fx:id="statsBackground" prefHeight="600.0" prefWidth="900.0" styleClass="Background" stylesheets="@Styles.css" xmlns="http://javafx.com/javafx/24.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.battleship.Controllers.StatsController">
+
+    <!-- Panel semitransparente de fondo para mejorar legibilidad -->
+    <Rectangle arcHeight="20.0" arcWidth="20.0" fill="#000000" height="480.0" layoutX="125.0" layoutY="60.0" opacity="0.7" width="650.0" />
+
+    <!-- Título ganador/perdedor -->
+    <Label fx:id="winnerLabel" layoutX="250.0" layoutY="80.0" style="-fx-text-fill: #FFD700; -fx-font-size: 48px; -fx-font-weight: bold; -fx-effect: dropshadow(gaussian, rgba(255,215,0,0.8), 15, 0.7, 0, 0);" text="🏆 RESULTADO 🏆" />
+
+    <!-- Línea decorativa superior -->
+    <Rectangle fill="#FFD700" height="4.0" layoutX="200.0" layoutY="160.0" width="500.0" />
+
+    <!-- Título de estadísticas -->
+    <Label layoutX="280.0" layoutY="185.0" style="-fx-text-fill: #FFFFFF; -fx-font-size: 28px; -fx-font-weight: bold; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 5, 0.5, 0, 0);" text="📊 ESTADÍSTICAS DEL JUEGO" />
+
+    <!-- Sección Jugador -->
+    <Label fx:id="playerNameLabel" layoutX="180.0" layoutY="250.0" style="-fx-text-fill: #4CAF50; -fx-font-size: 22px; -fx-font-weight: bold; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 5, 0.5, 0, 0);" text="👤 JUGADOR" />
+
+    <Label fx:id="playerShipsSunkLabel" layoutX="200.0" layoutY="285.0" style="-fx-text-fill: #FFFFFF; -fx-font-size: 18px; -fx-background-color: rgba(76, 175, 80, 0.3); -fx-padding: 8; -fx-background-radius: 5; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.6), 3, 0.5, 0, 0);" text="⚓ Barcos enemigos hundidos: 0/10" />
+
+    <Label fx:id="playerMissesLabel" layoutX="200.0" layoutY="330.0" style="-fx-text-fill: #FFFFFF; -fx-font-size: 18px; -fx-background-color: rgba(76, 175, 80, 0.3); -fx-padding: 8; -fx-background-radius: 5; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.6), 3, 0.5, 0, 0);" text="💦 Disparos fallidos: 0" />
+
+    <!-- Línea decorativa media -->
+    <Rectangle fill="#666666" height="2.0" layoutX="175.0" layoutY="380.0" width="550.0" />
+
+    <!-- Sección Máquina -->
+    <Label layoutX="180.0" layoutY="400.0" style="-fx-text-fill: #F44336; -fx-font-size: 22px; -fx-font-weight: bold; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 5, 0.5, 0, 0);" text="🤖 MÁQUINA" />
+
+    <Label fx:id="machineShipsSunkLabel" layoutX="200.0" layoutY="435.0" style="-fx-text-fill: #FFFFFF; -fx-font-size: 18px; -fx-background-color: rgba(244, 67, 54, 0.3); -fx-padding: 8; -fx-background-radius: 5; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.6), 3, 0.5, 0, 0);" text="⚓ Tus barcos hundidos: 0/10" />
+
+    <Label fx:id="machineMissesLabel" layoutX="200.0" layoutY="480.0" style="-fx-text-fill: #FFFFFF; -fx-font-size: 18px; -fx-background-color: rgba(244, 67, 54, 0.3); -fx-padding: 8; -fx-background-radius: 5; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.6), 3, 0.5, 0, 0);" text="💦 Fallos de la máquina: 0" />
+
+    <!-- Botón de regreso (sin tocar) -->
+    <Button fx:id="backToMenuButton" layoutX="6.0" layoutY="523.0" onAction="#onBackToMenu" prefHeight="70.0" prefWidth="99.0" styleClass="Back-button" stylesheets="@Styles.css" text="Volver al Menú" />
+
+</AnchorPane>
