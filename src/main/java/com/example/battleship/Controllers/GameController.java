@@ -1007,12 +1007,29 @@ public class GameController implements Initializable {
      * </p>
      */
     private void endGame() {
+        if (!isRunning) {
+            System.out.println("⚠️ endGame ya fue llamado, ignorando");
+            return;
+        }
+
         isRunning = false;
 
-        if (gameExecutor != null) {
+        System.out.println("🏁 === ENDING GAME ===");
+
+        Platform.runLater(() -> {
+            if (enemyCanvas != null) {
+                enemyCanvas.setOnMouseClicked(null);
+            }
+            if (playerCanvas != null) {
+                playerCanvas.setOnMouseClicked(null);
+                playerCanvas.setOnMouseMoved(null);
+            }
+        });
+
+        if (gameExecutor != null && !gameExecutor.isShutdown()) {
             gameExecutor.shutdownNow();
             try {
-                if (!gameExecutor.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                if (!gameExecutor.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS)) {
                     System.err.println("⚠️ gameExecutor did not terminate in time");
                 }
             } catch (InterruptedException e) {
@@ -1020,10 +1037,10 @@ public class GameController implements Initializable {
             }
         }
 
-        if (aiExecutor != null) {
+        if (aiExecutor != null && !aiExecutor.isShutdown()) {
             aiExecutor.shutdownNow();
             try {
-                if (!aiExecutor.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                if (!aiExecutor.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS)) {
                     System.err.println("⚠️ aiExecutor did not terminate in time");
                 }
             } catch (InterruptedException e) {
@@ -1082,20 +1099,21 @@ public class GameController implements Initializable {
         final int finalTotalShots = game.getHumanShots().size();
         final String finalPlayerName = currentPlayerData.getName();
 
+        String playerName = finalPlayerName.toLowerCase().trim();
+        String filename = "game_save_" + playerName + ".dat";
+        serializableHandler.delete(filename);
+        System.out.println("🗑️ Save file deleted: " + filename);
+
         Platform.runLater(() -> {
             try {
-                System.out.println("🏁 Game over - Winner: " + (playerWon ? "PLAYER" : "MACHINE"));
-
-                String playerName = finalPlayerName.toLowerCase().trim();
-                String filename = "game_save_" + playerName + ".dat";
-                serializableHandler.delete(filename);
-                System.out.println("🗑️ Save file deleted on game end: " + filename);
+                System.out.println("🎬 Preparing victory/defeat screen...");
 
                 stopVideo();
+
                 Stage currentStage = (Stage) videoContainer.getScene().getWindow();
-                currentStage.close();
 
                 VictoryView victoryView = VictoryView.getInstance();
+
                 victoryView.getController().setGameStats(
                         finalPlayerName,
                         playerWon,
@@ -1107,11 +1125,22 @@ public class GameController implements Initializable {
                         finalMachineMisses
                 );
 
+                victoryView.show();
+
+                PauseTransition delay = new PauseTransition(Duration.millis(150));
+                delay.setOnFinished(e -> {
+                    currentStage.close();
+                    System.out.println("✅ Game window closed, Victory window opened");
+                });
+                delay.play();
+
             } catch (Exception e) {
                 System.err.println("❌ Error ending game: " + e.getMessage());
                 e.printStackTrace();
             }
         });
+
+        System.out.println("🏁 === END GAME COMPLETE ===");
     }
 
     /**
